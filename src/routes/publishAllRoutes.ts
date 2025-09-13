@@ -1,0 +1,148 @@
+// src/routes/publishAllRoutes.ts
+import { Router, Request, Response } from 'express';
+import { protect } from '../middleware/authMiddleware';
+import Logger from '../config/logger';
+import * as Sentry from '@sentry/node';
+
+import { handleTumblrPost } from './tumblrRoutes';
+import { handleTwitterPost } from './twitterRoutes';
+import { handleBlueskyPost } from './blueskyRoutes';
+import { handleThreadsPost } from './threadsRoutes';
+
+const router = Router();
+
+interface FanOutPayload {
+  platforms: ('tumblr' | 'twitter' | 'bluesky' | 'threads')[];
+  text?: string;
+  images?: string[];
+  tags?: string[];
+  callbackUrl?: string;
+  platformOptions?: {
+    tumblr?: {
+      blogName: string;
+    }
+  };
+}
+
+async function processPublishAllRequest(payload: FanOutPayload) {
+  const { platforms, text, images, tags, callbackUrl, platformOptions } = payload;
+  const totalPlatforms = platforms.length;
+
+  for (let i = 0; i < totalPlatforms; i++) {
+    const platform = platforms[i];
+    const progress = Math.round(((i + 1) / totalPlatforms) * 100);
+    let status: 'success' | 'error' = 'success';
+    let errorDetails: string | null = null;
+
+    try {
+      Logger.info(`[Publish All] Processando plataforma: ${platform} (${i + 1}/${totalPlatforms})`);
+      switch (platform) {
+        case 'tumblr':
+          if (!platformOptions?.tumblr?.blogName) throw new Error('blogName é obrigatório para o Tumblr.');
+          await handleTumblrPost({ text, images, tags, ...platformOptions.tumblr });
+          break;
+        case 'twitter':
+          const listTwitter = images && images.length > 4 ? images.slice(0, 4) : images;
+          await handleTwitterPost({ text: text || '', images: listTwitter, tags });
+          break;
+        case 'bluesky':
+          const listBluesky = images && images.length > 4 ? images.slice(0, 4) : images;
+          await handleBlueskyPost({ text: text || '', images: listBluesky, tags });
+          break;
+        case 'threads':
+          await handleThreadsPost({ text: text || '', images, tags });
+          break;
+        default:
+          throw new Error(`Plataforma desconhecida: ${platform}`);
+      }
+      Logger.info(`[Publish All] Sucesso ao postar em: ${platform}`);
+
+    } catch (error: any) {
+      status = 'error';
+      errorDetails = error.message || 'Erro desconhecido';
+      Logger.error(`[Publish All] Falha ao postar em ${platform}:`, error);
+      Sentry.captureException(error, { extra: { platform } });
+    }
+
+    if (callbackUrl) {
+      try {
+        await fetch(callbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            platform,
+            status,
+            progress,
+            error: errorDetails,
+          }),
+        });
+      } catch (callbackError) {
+        Logger.error(`[Publish All] Falha ao enviar callback para ${callbackUrl}:`, callbackError);
+        Sentry.captureException(callbackError, { extra: { callbackUrl } });
+      }
+    }
+  }
+  Logger.info(`[Publish All] Processamento concluído.`);
+}
+
+/**
+ * @openapi
+ * /post/publish-all:
+ *  post:
+ *    summary: Posta em múltiplas plataformas de uma vez.
+ *    tags: [Publish All]
+ *    description: Inicia um processo em segundo plano para postar o mesmo conteúdo em várias plataformas e notifica o progresso através de uma URL de callback.
+ *    security:
+ *      - bearerAuth: []
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            properties:
+ *              platforms:
+ *                type: array
+ *                items:
+ *                  type: string
+ *                  enum: [tumblr, twitter, bluesky, threads]
+ *                example: [tumblr, twitter, bluesky, threads]
+ *              text:
+ *                type: string
+ *                example: "Olá, mundo!"
+ *              images:
+ *                type: array
+ *                items:
+ *                  type: string
+ *                  format: byte
+ *              tags:
+ *                type: array
+ *                items:
+ *                  type: string
+ *              callbackUrl:
+ *                type: string
+ *                format: uri
+ *                example: "https://meu-app.com/api/webhook"
+ *              platformOptions:
+ *                type: object
+ *                properties:
+ *                  tumblr:
+ *                    type: object
+ *                    properties:
+ *                      blogName: { type: string, example: "meu-blog-principal" }
+ *    responses:
+ *      '202':
+ *        description: Processamento aceito e iniciado em segundo plano.
+ */
+router.post('/publish-all', protect, (req: Request, res: Response) => {
+  const payload = req.body as FanOutPayload;
+
+  if (!payload.platforms || payload.platforms.length === 0)
+    return res.status(400).json({ message: 'O array de plataformas é obrigatório.' });
+  
+  res.status(202).json({ message: 'Processamento em lote iniciado. Você será notificado via callback.' });
+
+  processPublishAllRequest(payload);
+});
+
+export default router;
