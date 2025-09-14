@@ -59,6 +59,8 @@ router.post('/login', (req: Request, res: Response) => {
         const isCredentialsValid = username === API_USER && password === API_PASSWORD;
         const isAccessTokenValid = accessToken === API_ACCESS_TOKEN;
 
+        console.log(`Credenciais válidas: ${isCredentialsValid}, Token de acesso válido: ${isAccessTokenValid}`);
+
         if (!isCredentialsValid || !isAccessTokenValid)
             return res.status(401).json({ message: 'Credenciais inválidas.' });
 

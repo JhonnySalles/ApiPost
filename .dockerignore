@@ -1,0 +1,19 @@
+# Arquivo .dockerignore
+
+# Dependências e arquivos de build local
+node_modules
+dist
+.yarn/cache
+
+# Arquivos de log
+logs/
+*.log
+
+# Arquivos sensíveis
+.env
+setup-*.ts
+
+# Metadados do Git e do editor
+.git
+.gitignore
+.vscode

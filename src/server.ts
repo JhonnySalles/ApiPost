@@ -71,12 +71,6 @@ const swaggerOptions = {
             version: '1.0.0',
             description: 'API para postar conteúdo em diversas redes sociais.',
         },
-        servers: [
-            {
-                url: `http://localhost:${port}`,
-                description: 'Servidor de Desenvolvimento',
-            },
-        ],
         components: {
             securitySchemes: {
                 bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
