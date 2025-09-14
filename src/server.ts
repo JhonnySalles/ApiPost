@@ -3,10 +3,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express, { Request, Response, NextFunction } from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import * as Sentry from '@sentry/node';
-import { nodeProfilingIntegration } from '@sentry/profiling-node'; 
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import Logger from './config/logger';
 import authRoutes from './routes/authRoutes';
 import tumblrRoutes from './routes/tumblrRoutes';
@@ -16,53 +18,73 @@ import threadsRoutes from './routes/threadsRoutes';
 import publishAllRoutes from './routes/publishAllRoutes';
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  integrations: [
-    Sentry.httpIntegration(),
-    Sentry.expressIntegration(),
-    nodeProfilingIntegration(),
-  ],
-  tracesSampleRate: 1.0,
-  profilesSampleRate: 1.0,
+    dsn: process.env.SENTRY_DSN,
+    integrations: [
+        Sentry.httpIntegration(),
+        Sentry.expressIntegration(),
+        nodeProfilingIntegration(),
+    ],
+    tracesSampleRate: 1.0,
+    profilesSampleRate: 1.0,
 
-  beforeSend(event, hint) {
-    if (event.level === 'warning' || event.level === 'error' || event.level === 'fatal') {
-      Logger.warn(`Evento Sentry sendo enviado: ${event.event_id}`);
-      return event;
-    }
-    return null; 
-  },
+    beforeSend(event, hint) {
+        if (event.level === 'warning' || event.level === 'error' || event.level === 'fatal') {
+            Logger.warn(`Evento Sentry sendo enviado: ${event.event_id}`);
+            return event;
+        }
+        return null;
+    },
 });
 
 const app = express();
 const port = process.env.PORT || 8080;
+
+const server = http.createServer(app);
+export const io = new Server(server, {
+    cors: {
+        origin: "*", // Em produção, restrinja para o domínio do seu app cliente
+        methods: ["GET", "POST"]
+    }
+});
+
+io.on('connection', (socket) => {
+    Logger.info(`🔌 Novo cliente conectado: ${socket.id}`);
+
+    socket.on('disconnect', () => {
+        Logger.info(`🔌 Cliente desconectado: ${socket.id}`);
+    });
+});
+
+server.listen(port, 0, () => {
+    console.log(`Servidor escutando em 0.0.0.0 na porta ${port}`);
+});
 
 //app.use(Sentry.expressRequestHandler());
 
 app.use(express.json({ limit: '50mb' }));
 
 const swaggerOptions = {
-  swaggerDefinition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'API de Post',
-      version: '1.0.0',
-      description: 'API para postar conteúdo em diversas redes sociais.',
+    swaggerDefinition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'API de Post',
+            version: '1.0.0',
+            description: 'API para postar conteúdo em diversas redes sociais.',
+        },
+        servers: [
+            {
+                url: `http://localhost:${port}`,
+                description: 'Servidor de Desenvolvimento',
+            },
+        ],
+        components: {
+            securitySchemes: {
+                bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
+            }
+        },
+        security: [{ bearerAuth: [] }]
     },
-    servers: [
-      {
-        url: `http://localhost:${port}`,
-        description: 'Servidor de Desenvolvimento',
-      },
-    ],
-    components: {
-        securitySchemes: {
-          bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
-        }
-      },
-    security: [{ bearerAuth: [] }]
-  },
-  apis: ['./src/server.ts', './src/routes/*.ts'],
+    apis: ['./src/server.ts', './src/routes/*.ts'],
 };
 
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
@@ -84,11 +106,11 @@ app.get('/swagger-ui.html', (req, res) => {
  *         description: Sucesso.
  */
 app.get('/', (req, res) => {
-  res.send('A API está funcionando! Acesse /api-docs para ver a documentação.');
+    res.send('A API está funcionando! Acesse /api-docs para ver a documentação.');
 });
 
 app.use('/auth', authRoutes);
-app.use('/post', publishAllRoutes);
+app.use('/publish-all', publishAllRoutes);
 app.use('/tumblr', tumblrRoutes);
 app.use('/twitter', twitterRoutes);
 app.use('/bluesky', blueskyRoutes);
@@ -96,11 +118,11 @@ app.use('/threads', threadsRoutes);
 
 app.use(Sentry.expressErrorHandler());
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-  Logger.error('Erro não tratado capturado pelo handler final:', err.message || err);
-  res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
+    Logger.error('Erro não tratado capturado pelo handler final:', err.message || err);
+    res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
 });
 
 app.listen(port, () => {
-  Logger.info(`🚀 Servidor rodando em http://localhost:${port}`);
-  Logger.info(`📚 Documentação disponível em http://localhost:${port}/api-docs`);
+    Logger.info(`🚀 Servidor rodando em http://localhost:${port}`);
+    Logger.info(`📚 Documentação disponível em http://localhost:${port}/api-docs`);
 });

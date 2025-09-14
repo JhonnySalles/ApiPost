@@ -6,12 +6,12 @@
  * @returns Um objeto com mimeType e data (base64 puro) ou null se o formato for inválido.
  */
 export function parseDataUrl(dataUrl: string): { mimeType: string; data: string } | null {
-  const match = dataUrl.match(/^data:(.+);base64,(.+)$/);
-  if (!match)
-    return null;
-  
-  return {
-    mimeType: match[1],
-    data: match[2],
-  };
+    const match = dataUrl.match(/^data:(.+);base64,(.+)$/);
+    if (!match)
+        return null;
+
+    return {
+        mimeType: match[1],
+        data: match[2],
+    };
 }

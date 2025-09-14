@@ -11,17 +11,17 @@ const router = Router();
 interface TwitterPostOptions {
     text: string;
     images?: string[];
-    tags?: string[]; 
+    tags?: string[];
 }
 
 export async function handleTwitterPost(options: TwitterPostOptions) {
- 
+
     const { text, images, tags } = options;
 
-    if (!text && (!images || images.length === 0)) 
+    if (!text && (!images || images.length === 0))
         throw new Error('É necessário fornecer texto ou imagens.');
 
-    if (images && images.length > 4) 
+    if (images && images.length > 4)
         throw new Error('É permitido no máximo 4 imagens por tweet.');
 
     const {
@@ -34,7 +34,7 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
     if (!TWITTER_APP_KEY || !TWITTER_APP_SECRET || !TWITTER_ACCESS_TOKEN || !TWITTER_ACCESS_SECRET)
         throw new Error('As 4 chaves do Twitter (OAuth 1.0a) não estão configuradas no .env');
 
-  try {
+    try {
         const client = new TwitterApi({
             appKey: TWITTER_APP_KEY,
             appSecret: TWITTER_APP_SECRET,
@@ -52,7 +52,7 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
                     Logger.warn('Formato de imagem base64 inválido. Pulando imagem.');
                     continue;
                 }
-        
+
                 const imageType = parsedImage.mimeType.split('/')[1];
                 const imageBuffer = Buffer.from(parsedImage.data, 'base64');
                 const mediaId = await client.v1.uploadMedia(imageBuffer, { type: imageType });
@@ -72,7 +72,7 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
             text: finalText,
             media: mediaIds.length > 0 ? { media_ids: mediaIds as [string] } : undefined,
         });
-        
+
         Logger.info(`Tweet criado com sucesso! ID: ${tweetResult.data.id}`);
         return { success: true, data: tweetResult.data };
     } catch (error) {
@@ -111,12 +111,12 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
  *        description: Tweet criado com sucesso.
  */
 router.post('/post', protect, async (req: Request, res: Response) => {
-  try {
-      const result = await handleTwitterPost(req.body);
-      res.status(201).json({ message: 'Tweet criado com sucesso!', ...result });
-  } catch (error: any) {
-      res.status(500).json({ message: error.message || 'Erro ao postar no Twitter.' });
-  }
+    try {
+        const result = await handleTwitterPost(req.body);
+        res.status(201).json({ message: 'Tweet criado com sucesso!', ...result });
+    } catch (error: any) {
+        res.status(500).json({ message: error.message || 'Erro ao postar no Twitter.' });
+    }
 });
 
 export default router;

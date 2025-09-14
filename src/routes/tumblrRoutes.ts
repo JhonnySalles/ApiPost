@@ -10,10 +10,10 @@ import { parseDataUrl } from '../utils/parsing';
 const router = Router();
 
 const tumblrClient = tumblr.createClient({
-  consumer_key: process.env.TUMBLR_CONSUMER_KEY,
-  consumer_secret: process.env.TUMBLR_CONSUMER_SECRET,
-  token: process.env.TUMBLR_ACCESS_TOKEN,
-  token_secret: process.env.TUMBLR_ACCESS_TOKEN_SECRET,
+    consumer_key: process.env.TUMBLR_CONSUMER_KEY,
+    consumer_secret: process.env.TUMBLR_CONSUMER_SECRET,
+    token: process.env.TUMBLR_ACCESS_TOKEN,
+    token_secret: process.env.TUMBLR_ACCESS_TOKEN_SECRET,
 });
 
 /**
@@ -29,81 +29,95 @@ const tumblrClient = tumblr.createClient({
  *        description: Lista de blogs retornada com sucesso.
  *        content:
  *          application/json:
- *            example:
- *              blogs: ["blog-1", "blog-2"]
+ *            schema:
+ *              type: object
+ *              properties:
+ *                blogs:
+ *                  type: array
+ *                  items:
+ *                    type: object
+ *                    properties:
+ *                      name:
+ *                        type: string
+ *                        description: "O identificador do blog, usado nas requisições de postagem."
+ *                        example: "meu-blog-principal"
+ *                      title:
+ *                        type: string
+ *                        description: "O título de exibição do blog."
+ *                        example: "O Blog Incrível de Testes"
  */
 router.get('/blogs', protect, async (req: Request, res: Response) => {
-  try {
-    const userInfo = await tumblrClient.userInfo();
-    const blogNames = userInfo.user.blogs.map((blog: any) => blog.name);
+    try {
+        const userInfo = await tumblrClient.userInfo();
+        const blogs = userInfo.user.blogs.map((blog: any) => ({ name: blog.name, title: blog.title, }));
 
-    Logger.info('Lista de blogs do Tumblr foi solicitada e retornada com sucesso.');
-    res.status(200).json({ blogs: blogNames });
-  } catch (error) {
-    Logger.error('Erro ao buscar blogs do Tumblr:', error);
-    Sentry.captureException(error);
-    res.status(500).json({ message: 'Erro ao buscar blogs do Tumblr.' });
-  }
+        Logger.info('Lista de blogs do Tumblr foi solicitada e retornada com sucesso.');
+        res.status(200).json({ blogs });
+    } catch (error) {
+        Logger.error('Erro ao buscar blogs do Tumblr:', error);
+        Sentry.captureException(error);
+        res.status(500).json({ message: 'Erro ao buscar blogs do Tumblr.' });
+    }
 });
 
 interface TumblrPostOptions {
-  blogName: string;
-  text?: string;
-  images?: string[];
-  tags?: string[];
+    blogName: string;
+    text?: string;
+    images?: string[];
+    tags?: string[];
 }
 
 export async function handleTumblrPost(options: TumblrPostOptions) {
-  const { blogName, text, images, tags } = options;
+    const { blogName, text, images, tags } = options;
 
-  if (!blogName) 
-    throw new Error('O nome do blog (blogName) é obrigatório para o Tumblr.');
+    if (!blogName)
+        throw new Error('O nome do blog (blogName) é obrigatório para o Tumblr.');
 
-  if (!text && (!images || images.length === 0)) 
-    throw new Error('É necessário fornecer texto ou imagens.');
+    if (!text && (!images || images.length === 0))
+        throw new Error('É necessário fornecer texto ou imagens.');
 
-  try {
-    let responseData;
+    try {
+        let responseData;
 
-    if (images && images.length > 0) {
-        const postOptions: any = {
-            tags: tags ? tags.join(',') : undefined,
-        };
-    
         if (images && images.length > 0) {
-            Logger.info('Preparando post de FOTO para o Tumblr (método legado)...');
-            postOptions.type = 'photo';
-            postOptions.caption = text;
-    
-            const imageBuffers = images.map((imageDataUrl: string) => {
+            const postOptions: any = {
+                tags: tags ? tags.join(',') : undefined,
+            };
+
+            if (images && images.length > 0) {
+                Logger.info('Preparando post de FOTO para o Tumblr (método legado)...');
+                postOptions.type = 'photo';
+                postOptions.caption = text;
+
+                const imageBuffers = images.map((imageDataUrl: string) => {
                     const parsedImage = parseDataUrl(imageDataUrl);
                     return parsedImage ? Buffer.from(parsedImage.data, 'base64') : null;
                 })
-                .filter(Boolean);
-    
-            postOptions.data = imageBuffers;
-        } else if (text) {
-            Logger.info('Preparando post de TEXTO para o Tumblr (método legado)...');
-            postOptions.type = 'text';
-            postOptions.title = tags && tags.length > 0 ? tags[0] : '';
-            postOptions.body = text;
+                    .filter(Boolean);
+
+                postOptions.data = imageBuffers;
+            } else if (text) {
+                Logger.info('Preparando post de TEXTO para o Tumblr (método legado)...');
+                postOptions.type = 'text';
+                postOptions.title = tags && tags.length > 0 ? tags[0] : '';
+                postOptions.body = text;
+            }
+
+            responseData = await new Promise((resolve, reject) => {
+                tumblrClient.createLegacyPost(blogName, postOptions, (err, data) => (err ? reject(err) : resolve(data)));
+            });
+        } else {
+            const contentBlocks: any[] = [];
+            contentBlocks.push({ type: 'text', text: text });
+            responseData = await tumblrClient.createPost(blogName, { content: contentBlocks, tags: tags, });
         }
-    
-        responseData = await new Promise((resolve, reject) => {
-            tumblrClient.createLegacyPost(blogName, postOptions, (err, data) => (err ? reject(err) : resolve(data)));
-        });
-    } else {
-        const contentBlocks: any[] = [];
-        contentBlocks.push({ type: 'text', text: text });
-        responseData = await tumblrClient.createPost(blogName, { content: contentBlocks, tags: tags, });
+        Logger.info(`Post criado no Tumblr com sucesso para o blog ${blogName}`);
+        return { success: true, data: responseData };
+    } catch (error) {
+        Logger.error(`Erro ao postar no Tumblr no blog ${blogName}:`, error);
+        Sentry.captureException(error, { extra: { blogName } });
+        throw error;
     }
-    Logger.info(`Post criado no Tumblr com sucesso para o blog ${blogName}`);
-    return { success: true, data: responseData };
-  } catch (error) {
-    Logger.error(`Erro ao postar no Tumblr no blog ${blogName}:`, error);
-    Sentry.captureException(error, { extra: { blogName } });
-    throw error;
-  }
 }
 
 /**
@@ -139,12 +153,12 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
  *        description: Post criado com sucesso.
  */
 router.post('/post', protect, async (req: Request, res: Response) => {
-  try {
-    const result = await handleTumblrPost(req.body);
-    res.status(201).json({ message: 'Post criado com sucesso!', ...result });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message || 'Erro ao postar no Tumblr.' });
-  }
+    try {
+        const result = await handleTumblrPost(req.body);
+        res.status(201).json({ message: 'Post criado com sucesso!', ...result });
+    } catch (error: any) {
+        res.status(500).json({ message: error.message || 'Erro ao postar no Tumblr.' });
+    }
 });
 
 export default router;
