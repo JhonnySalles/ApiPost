@@ -14,15 +14,15 @@ const client = tumblr.createClient({
     token_secret: '',
 });
 
-const getOAuthRequestToken = util.promisify(client.getRequestToken.bind(client));
+//const getOAuthRequestToken = util.promisify(client.getRequestToken.bind(client));
 
 async function run() {
     console.log('🚀 Iniciando processo de autorização do Tumblr...');
 
     try {
-        const { oauth_token, oauth_token_secret, auth_url } = await getOAuthRequestToken('http://localhost/callback');
+        //const { oauth_token, oauth_token_secret, auth_url } = await getOAuthRequestToken('http://localhost/callback');
 
-        console.log('\n================================================================');
+        /*console.log('\n================================================================');
         console.log(' PASSO 1: Autorize a aplicação no seu navegador:');
         console.log(` 👉 Visite esta URL: ${auth_url}`);
         console.log('================================================================\n');
@@ -50,7 +50,7 @@ async function run() {
         console.log(`TUMBLR_CONSUMER_SECRET="${TUMBLR_CONSUMER_SECRET}"`);
         console.log(`TUMBLR_ACCESS_TOKEN="${accessToken}"`);
         console.log(`TUMBLR_ACCESS_TOKEN_SECRET="${accessTokenSecret}"`);
-        console.log('----------------------------------------------------');
+        console.log('----------------------------------------------------');*/
 
     } catch (error) {
         console.error('❌ Ocorreu um erro durante a autorização:', error);
