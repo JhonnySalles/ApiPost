@@ -15,9 +15,8 @@ async function getAuthenticatedClient(): Promise<ThreadsAPI> {
     Logger.info('Cliente do Threads não encontrado. Inicializando e realizando login...');
     const { THREADS_USERNAME, THREADS_PASSWORD } = process.env;
 
-    if (!THREADS_USERNAME || !THREADS_PASSWORD) {
+    if (!THREADS_USERNAME || !THREADS_PASSWORD)
       throw new Error('As credenciais do Threads não estão configuradas no .env');
-    }
 
     threadsAPI = new ThreadsAPI({
       username: THREADS_USERNAME,
@@ -96,7 +95,17 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
  *      content:
  *        application/json:
  *          schema:
- *            $ref: '#/components/schemas/SocialPostRequest'
+ *            allOf:
+ *              - $ref: '#/components/schemas/SocialPostRequest'
+ *              - type: object
+ *                properties:
+ *                  text: { type: string }
+ *                  images: { type: array, items: { type: base64 } }
+ *                  tags: { type: array, items: { type: string } }
+ *          example:
+ *            text: "Este é um tweet de exemplo!"
+ *            tags: ["api", "teste"]
+ *            images: ["data:image/png;base64,iVBORw0KGgo..."]
  *    responses:
  *      '201':
  *        description: Post criado com sucesso.

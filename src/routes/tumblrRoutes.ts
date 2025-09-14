@@ -27,16 +27,18 @@ const tumblrClient = tumblr.createClient({
  *    responses:
  *      '200':
  *        description: Lista de blogs retornada com sucesso.
+ *        content:
+ *          application/json:
+ *            example:
+ *              blogs: ["blog-1", "blog-2"]
  */
 router.get('/blogs', protect, async (req: Request, res: Response) => {
   try {
-    // CORREÇÃO: A nova biblioteca usa async/await diretamente, sem promessas manuais.
     const userInfo = await tumblrClient.userInfo();
     const blogNames = userInfo.user.blogs.map((blog: any) => blog.name);
 
     Logger.info('Lista de blogs do Tumblr foi solicitada e retornada com sucesso.');
     res.status(200).json({ blogs: blogNames });
-
   } catch (error) {
     Logger.error('Erro ao buscar blogs do Tumblr:', error);
     Sentry.captureException(error);
@@ -54,25 +56,47 @@ interface TumblrPostOptions {
 export async function handleTumblrPost(options: TumblrPostOptions) {
   const { blogName, text, images, tags } = options;
 
-  if (!blogName) throw new Error('O nome do blog (blogName) é obrigatório para o Tumblr.');
-  if (!text && (!images || images.length === 0)) throw new Error('É necessário fornecer texto ou imagens.');
+  if (!blogName) 
+    throw new Error('O nome do blog (blogName) é obrigatório para o Tumblr.');
+
+  if (!text && (!images || images.length === 0)) 
+    throw new Error('É necessário fornecer texto ou imagens.');
 
   try {
-    const contentBlocks: any[] = [];
-    if (text) contentBlocks.push({ type: 'text', text: text });
+    let responseData;
+
     if (images && images.length > 0) {
-      for (const imageDataUrl of images) {
-        const parsedImage = parseDataUrl(imageDataUrl);
-        if (parsedImage) {
-          const mediaStream = Readable.from(Buffer.from(parsedImage.data, 'base64'));
-          contentBlocks.push({ type: 'image', media: mediaStream, alt_text: text || '' });
+        const postOptions: any = {
+            tags: tags ? tags.join(',') : undefined,
+        };
+    
+        if (images && images.length > 0) {
+            Logger.info('Preparando post de FOTO para o Tumblr (método legado)...');
+            postOptions.type = 'photo';
+            postOptions.caption = text;
+    
+            const imageBuffers = images.map((imageDataUrl: string) => {
+                    const parsedImage = parseDataUrl(imageDataUrl);
+                    return parsedImage ? Buffer.from(parsedImage.data, 'base64') : null;
+                })
+                .filter(Boolean);
+    
+            postOptions.data = imageBuffers;
+        } else if (text) {
+            Logger.info('Preparando post de TEXTO para o Tumblr (método legado)...');
+            postOptions.type = 'text';
+            postOptions.title = tags && tags.length > 0 ? tags[0] : '';
+            postOptions.body = text;
         }
-      }
+    
+        responseData = await new Promise((resolve, reject) => {
+            tumblrClient.createLegacyPost(blogName, postOptions, (err, data) => (err ? reject(err) : resolve(data)));
+        });
+    } else {
+        const contentBlocks: any[] = [];
+        contentBlocks.push({ type: 'text', text: text });
+        responseData = await tumblrClient.createPost(blogName, { content: contentBlocks, tags: tags, });
     }
-    const responseData = await tumblrClient.createPost(blogName, {
-        content: contentBlocks,
-        tags: tags,
-    });
     Logger.info(`Post criado no Tumblr com sucesso para o blog ${blogName}`);
     return { success: true, data: responseData };
   } catch (error) {
@@ -100,9 +124,16 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
  *              - type: object
  *                properties:
  *                  blogName: { type: string }
+ *                  text: { type: string }
+ *                  images: { type: array, items: { type: base64 } }
  *                  tags: { type: array, items: { type: string } }
  *                required:
  *                  - blogName
+ *          example:
+ *            blogName: "meu-blog-principal"
+ *            text: "Este é um tweet de exemplo!"
+ *            tags: ["api", "teste"]
+ *            images: ["data:image/png;base64,iVBORw0KGgo..."]
  *    responses:
  *      '201':
  *        description: Post criado com sucesso.

@@ -37,8 +37,8 @@ interface BlueskyPostOptions {
 export async function handleBlueskyPost(options: BlueskyPostOptions) {
   const { text, images, tags } = options;
 
-  if (!text) 
-    throw new Error('O texto (text) é obrigatório para o Bluesky.');
+  if (!text && (!images || images.length === 0)) 
+    throw new Error('É necessário fornecer texto ou imagens.');
 
   if (images && images.length > 4) 
     throw new Error('É permitido no máximo 4 imagens por post no Bluesky.');
@@ -112,7 +112,17 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
  *      content:
  *        application/json:
  *          schema:
- *            $ref: '#/components/schemas/SocialPostRequest'
+ *            allOf:
+ *              - $ref: '#/components/schemas/SocialPostRequest'
+ *              - type: object
+ *                properties:
+ *                  text: { type: string }
+ *                  images: { type: array, items: { type: base64 } }
+ *                  tags: { type: array, items: { type: string } }
+ *          example:
+ *            text: "Este é um tweet de exemplo!"
+ *            tags: ["api", "teste"]
+ *            images: ["data:image/png;base64,iVBORw0KGgo..."]
  *    responses:
  *      '201':
  *        description: Post criado com sucesso.

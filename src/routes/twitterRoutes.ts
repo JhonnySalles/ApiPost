@@ -4,6 +4,7 @@ import { TwitterApi } from 'twitter-api-v2';
 import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
+import { parseDataUrl } from '../utils/parsing';
 
 const router = Router();
 
@@ -14,33 +15,47 @@ interface TwitterPostOptions {
 }
 
 export async function handleTwitterPost(options: TwitterPostOptions) {
+ 
     const { text, images, tags } = options;
 
-    if (!text)
-        throw new Error('O texto (text) é obrigatório.');
-    
-    if (images && images.length > 4)
+    if (!text && (!images || images.length === 0)) 
+        throw new Error('É necessário fornecer texto ou imagens.');
+
+    if (images && images.length > 4) 
         throw new Error('É permitido no máximo 4 imagens por tweet.');
 
-    const { TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET, TWITTER_REFRESH_TOKEN } = process.env;
+    const {
+        TWITTER_APP_KEY,
+        TWITTER_APP_SECRET,
+        TWITTER_ACCESS_TOKEN,
+        TWITTER_ACCESS_SECRET,
+    } = process.env;
 
-    if (!TWITTER_CLIENT_ID || !TWITTER_CLIENT_SECRET || !TWITTER_REFRESH_TOKEN)
-      throw new Error('As credenciais do Twitter não estão configuradas no .env');
+    if (!TWITTER_APP_KEY || !TWITTER_APP_SECRET || !TWITTER_ACCESS_TOKEN || !TWITTER_ACCESS_SECRET)
+        throw new Error('As 4 chaves do Twitter (OAuth 1.0a) não estão configuradas no .env');
 
-    try {
+  try {
         const client = new TwitterApi({
-        clientId: TWITTER_CLIENT_ID,
-        clientSecret: TWITTER_CLIENT_SECRET,
+            appKey: TWITTER_APP_KEY,
+            appSecret: TWITTER_APP_SECRET,
+            accessToken: TWITTER_ACCESS_TOKEN,
+            accessSecret: TWITTER_ACCESS_SECRET,
         });
 
-        const { client: refreshedClient, accessToken, refreshToken: newRefreshToken } = await client.refreshOAuth2Token(TWITTER_REFRESH_TOKEN);
         const mediaIds: string[] = [];
 
         if (images && images.length > 0) {
             Logger.info('Fazendo upload de imagens para o Twitter...');
-            for (const base64Image of images) {
-                const imageBuffer = Buffer.from(base64Image, 'base64');
-                const mediaId = await refreshedClient.v1.uploadMedia(imageBuffer, { mimeType: 'image/jpeg', });
+            for (const imageDataUrl of images) {
+                const parsedImage = parseDataUrl(imageDataUrl);
+                if (!parsedImage) {
+                    Logger.warn('Formato de imagem base64 inválido. Pulando imagem.');
+                    continue;
+                }
+        
+                const imageType = parsedImage.mimeType.split('/')[1];
+                const imageBuffer = Buffer.from(parsedImage.data, 'base64');
+                const mediaId = await client.v1.uploadMedia(imageBuffer, { type: imageType });
                 mediaIds.push(mediaId);
             }
             Logger.info(`Upload de ${mediaIds.length} imagem(ns) concluído.`);
@@ -48,12 +63,12 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
 
         let finalText = text;
         if (tags && tags.length > 0) {
-        const hashtags = tags.map(tag => `#${tag}`).join(' ');
-        finalText = `${text}\n\n${hashtags}`;
+            const hashtags = tags.map(tag => `#${tag}`).join(' ');
+            finalText = `${text}\n\n${hashtags}`;
         }
 
         Logger.info('Enviando o tweet...');
-        const tweetResult = await refreshedClient.v2.tweet({
+        const tweetResult = await client.v2.tweet({
             text: finalText,
             media: mediaIds.length > 0 ? { media_ids: mediaIds as [string] } : undefined,
         });
@@ -80,7 +95,17 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
  *      content:
  *        application/json:
  *          schema:
- *            $ref: '#/components/schemas/SocialPostRequest'
+ *            allOf:
+ *              - $ref: '#/components/schemas/SocialPostRequest'
+ *              - type: object
+ *                properties:
+ *                  text: { type: string }
+ *                  images: { type: array, items: { type: base64 } }
+ *                  tags: { type: array, items: { type: string } }
+ *          example:
+ *            text: "Este é um tweet de exemplo!"
+ *            tags: ["api", "teste"]
+ *            images: ["data:image/png;base64,iVBORw0KGgo..."]
  *    responses:
  *      '201':
  *        description: Tweet criado com sucesso.

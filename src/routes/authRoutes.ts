@@ -11,6 +11,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 const API_USER = process.env.API_USER;
 const API_PASSWORD = process.env.API_PASSWORD;
 const API_ACCESS_TOKEN = process.env.API_ACCESS_TOKEN;
+const TOKEN_EXPIRATION_IN_SECONDS = 24 * 60 * 60; 
 
 /**
  * @openapi
@@ -23,10 +24,24 @@ const API_ACCESS_TOKEN = process.env.API_ACCESS_TOKEN;
  *      content:
  *        application/json:
  *          schema:
- *            $ref: '#/components/schemas/LoginRequest'
+ *            allOf:
+ *              - $ref: '#/components/schemas/SocialPostRequest'
+ *              - type: object
+ *                properties:
+ *                  accessToken: { type: string }
+ *          example:
+ *            username: "seu-usuario"
+ *            password: "sua-senha-forte"
+ *            accessToken: "um-token-secreto-e-longo"
  *    responses:
  *      '200':
  *        description: Login bem-sucedido.
+ *        content:
+ *          application/json:
+ *            example:
+ *              message: "Autenticação bem-sucedida!"
+ *              token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *              expiresAt: "2025-09-14T22:38:59.123Z"
  *      '401':
  *        description: Credenciais inválidas.
  *        content:
@@ -47,9 +62,11 @@ router.post('/login', (req: Request, res: Response) => {
     if (!isCredentialsValid || !isAccessTokenValid)
         return res.status(401).json({ message: 'Credenciais inválidas.' });
     
-    const token = jwt.sign({ username: username }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ username: username }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION_IN_SECONDS });
 
-    res.status(200).json({ message: 'Autenticação bem-sucedida!', token: token });
+    const expirationDate = new Date(Date.now() + TOKEN_EXPIRATION_IN_SECONDS * 1000);
+
+    res.status(200).json({ message: 'Autenticação bem-sucedida!', token: token, expiration: expirationDate.toISOString(), });
   } catch (error) {
     Sentry.captureException(error);
     Logger.error('Erro inesperado no endpoint /login:', error);
@@ -71,7 +88,13 @@ router.post('/login', (req: Request, res: Response) => {
  *      content:
  *        application/json:
  *          schema:
- *            $ref: '#/components/schemas/RefreshTokenRequest'
+ *            allOf:
+ *              - $ref: '#/components/schemas/SocialPostRequest'
+ *              - type: object
+ *                properties:
+ *                  accessToken: { type: string }
+ *          example:
+ *            accessToken: "um-token-secreto-e-longo"
  *    responses:
  *      '200':
  *        description: Token renovado com sucesso.
@@ -89,12 +112,14 @@ router.post('/token/refresh', (req: Request, res: Response) => {
     
     jwt.verify(oldToken, JWT_SECRET, { ignoreExpiration: true }, (err, decoded) => {
         if (err)
-        return res.status(401).json({ message: 'Token JWT inválido.' });
+            return res.status(401).json({ message: 'Token JWT inválido.' });
         
         const payload = decoded as { username: string };
-        const newToken = jwt.sign({ username: payload.username }, JWT_SECRET, { expiresIn: '24h' });
+        const newToken = jwt.sign({ username: payload.username }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION_IN_SECONDS });
         
-        res.status(200).json({ message: 'Token renovado com sucesso!', token: newToken });
+        const newExpirationDate = new Date(Date.now() + TOKEN_EXPIRATION_IN_SECONDS * 1000);
+
+        res.status(200).json({ message: 'Token renovado com sucesso!', token: newToken, expiration: newExpirationDate.toISOString(), });
     });
   } catch (error) {
     Sentry.captureException(error);

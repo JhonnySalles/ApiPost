@@ -1,55 +1,63 @@
-// setup-twitter.ts
+// setup-twitter.ts (versão para OAuth 1.0a)
 import { TwitterApi } from 'twitter-api-v2';
 import inquirer from 'inquirer';
-import util from 'util';
 import http from 'http';
 import url from 'url';
 
-// Cole os valores que você obteve do Portal do Desenvolvedor X
-const TWITTER_CLIENT_ID = 'SEU_CLIENT_ID_AQUI';
-const TWITTER_CLIENT_SECRET = 'SEU_CLIENT_SECRET_AQUI';
+// Cole os valores da seção "Consumer Keys" do seu app no Portal do Desenvolvedor
+const TWITTER_APP_KEY = 'svQumnwOMOhREjpgfZtZUgvk8';
+const TWITTER_APP_SECRET = 'jZmyIo4H3SunpH3A6MVOFUdhJW0rDaGkiZZMDTnrvcfrjptygi';
 
-const REDIRECT_URI = 'http://127.0.0.1:3000/callback';
-
-const client = new TwitterApi({
-  clientId: TWITTER_CLIENT_ID,
-  clientSecret: TWITTER_CLIENT_SECRET,
-});
+const CALLBACK_URL = 'http://127.0.0.1:3000/callback';
 
 async function run() {
-  const { url: authUrl, codeVerifier } = client.generateOAuth2AuthLink(
-    REDIRECT_URI,
-    { scope: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'] }
-  );
+  const client = new TwitterApi({
+    appKey: TWITTER_APP_KEY,
+    appSecret: TWITTER_APP_SECRET,
+  });
 
-  console.log('🚀 Iniciando processo de autorização do Twitter (X)...');
+  const authLink = await client.generateAuthLink(CALLBACK_URL, { authAccessType: 'write' });
+
+  console.log('🚀 Iniciando processo de autorização do Twitter (OAuth 1.0a)...');
   console.log('\n================================================================');
   console.log(' PASSO 1: Autorize a aplicação no seu navegador:');
-  console.log(` 👉 Visite esta URL: ${authUrl}`);
+  console.log(` 👉 Visite esta URL: ${authLink.url}`);
   console.log('================================================================\n');
 
   const server = http.createServer((req, res) => {
     if (req.url && req.url.startsWith('/callback')) {
       const parsedUrl = url.parse(req.url, true);
-      const code = parsedUrl.query.code as string;
+      const { oauth_token, oauth_verifier } = parsedUrl.query;
 
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end('<h1>Autorização recebida!</h1><p>Você pode fechar esta janela e voltar ao terminal.</p>');
       server.close();
 
-      client.loginWithOAuth2({ code, codeVerifier, redirectUri: REDIRECT_URI })
-        .then(({ refreshToken }) => {
-            console.log('\n✅ Autorização concluída com sucesso!');
-            console.log('\nCopie as linhas abaixo e adicione ao seu arquivo .env:\n');
-            console.log('----------------------------------------------------');
-            console.log(`TWITTER_CLIENT_ID="${TWITTER_CLIENT_ID}"`);
-            console.log(`TWITTER_CLIENT_SECRET="${TWITTER_CLIENT_SECRET}"`);
-            console.log(`TWITTER_REFRESH_TOKEN="${refreshToken}"`);
-            console.log('----------------------------------------------------');
+      if (!oauth_token || !oauth_verifier || typeof oauth_verifier !== 'string') {
+        console.error('❌ Callback recebido é inválido.');
+        return;
+      }
+
+      // Cria um novo cliente com os tokens temporários para fazer o login
+      const clientLogin = new TwitterApi({
+        appKey: TWITTER_APP_KEY,
+        appSecret: TWITTER_APP_SECRET,
+        accessToken: oauth_token as string,
+        accessSecret: authLink.oauth_token_secret, // O secret do token temporário
+      });
+
+      clientLogin.login(oauth_verifier)
+        .then(({ accessToken, accessSecret }) => {
+          console.log('\n✅ Autorização concluída com sucesso!');
+          console.log('\nCopie as linhas abaixo e adicione ao seu arquivo .env:\n');
+          console.log('----------------------------------------------------');
+          console.log(`TWITTER_APP_KEY="${TWITTER_APP_KEY}"`);
+          console.log(`TWITTER_APP_SECRET="${TWITTER_APP_SECRET}"`);
+          console.log(`TWITTER_ACCESS_TOKEN="${accessToken}"`);
+          console.log(`TWITTER_ACCESS_SECRET="${accessSecret}"`);
+          console.log('----------------------------------------------------');
         })
-        .catch((err) => {
-            console.error('❌ Erro ao obter o refresh token:', err);
-        });
+        .catch((err) => console.error('❌ Erro ao obter os tokens de acesso finais:', err));
     }
   }).listen(3000, () => {
     console.log('Aguardando autorização no navegador... (escutando em http://127.0.0.1:3000)');
