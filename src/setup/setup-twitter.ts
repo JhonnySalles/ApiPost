@@ -5,8 +5,8 @@ import http from 'http';
 import url from 'url';
 
 // Cole os valores da seção "Consumer Keys" do seu app no Portal do Desenvolvedor
-const TWITTER_APP_KEY = 'svQumnwOMOhREjpgfZtZUgvk8';
-const TWITTER_APP_SECRET = 'jZmyIo4H3SunpH3A6MVOFUdhJW0rDaGkiZZMDTnrvcfrjptygi';
+const TWITTER_APP_KEY = 'TWITTER_APP_KEY_AQUI';
+const TWITTER_APP_SECRET = 'TWITTER_APP_SECRET_AQUI';
 
 const CALLBACK_URL = 'http://127.0.0.1:3000/callback';
 
