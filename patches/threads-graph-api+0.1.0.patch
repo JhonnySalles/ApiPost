@@ -1,0 +1,22 @@
+diff --git a/node_modules/threads-graph-api/dist/src/api-client.js b/node_modules/threads-graph-api/dist/src/api-client.js
+index adfd559..f4b2852 100644
+--- a/node_modules/threads-graph-api/dist/src/api-client.js
++++ b/node_modules/threads-graph-api/dist/src/api-client.js
+@@ -71,7 +71,7 @@ var __rest = (this && this.__rest) || function (s, e) {
+         }
+     return t;
+ };
+-import { CreateMediaContainerResponseSchema, ErrorResponseSchema, ExchangeAuthorizationCodeResponseSchema, GetAccountMetricsResponseSchema, GetConversationResponseSchema, GetMediaMetricsResponseSchema, GetMediaObjectResponseSchema, GetRepliesResponseSchema, GetUserProfileResponseSchema, GetUserThreadsPublishingLimitResponseSchema, GetUserThreadsResponseSchema, ManageReplyResponseSchema, PublishResponseSchema, } from './types';
++import { CreateMediaContainerResponseSchema, ErrorResponseSchema, ExchangeAuthorizationCodeResponseSchema, GetAccountMetricsResponseSchema, GetConversationResponseSchema, GetMediaMetricsResponseSchema, GetMediaObjectResponseSchema, GetRepliesResponseSchema, GetUserProfileResponseSchema, GetUserThreadsPublishingLimitResponseSchema, GetUserThreadsResponseSchema, ManageReplyResponseSchema, PublishResponseSchema, } from './types.js';
+ var ThreadsApiError = /** @class */ (function (_super) {
+     __extends(ThreadsApiError, _super);
+     function ThreadsApiError(error) {
+diff --git a/node_modules/threads-graph-api/dist/src/index.js b/node_modules/threads-graph-api/dist/src/index.js
+index 671fb77..92d3d80 100644
+--- a/node_modules/threads-graph-api/dist/src/index.js
++++ b/node_modules/threads-graph-api/dist/src/index.js
+@@ -1,2 +1,2 @@
+-export * from './api-client';
+-export * from './types';
++export * from './api-client.js';
++export * from './types.js';

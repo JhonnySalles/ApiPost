@@ -1,34 +1,12 @@
 // src/routes/threadsRoutes.ts
 import { Router, Request, Response } from 'express';
-import { ThreadsAPI } from 'threads-api';
+import { ThreadsAuthenticatedApiClient, ThreadsApiError } from 'threads-graph-api';
 import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
-import { parseDataUrl } from '../utils/parsing';
+import { uploadImage } from '../services/cloudinaryService';
 
 const router = Router();
-
-let threadsAPI: ThreadsAPI | undefined;
-
-async function getAuthenticatedClient(): Promise<ThreadsAPI> {
-    if (!threadsAPI) {
-        Logger.info('Cliente do Threads não encontrado. Inicializando e realizando login...');
-        const { THREADS_USERNAME, THREADS_PASSWORD, THREADS_DEVICE_ID } = process.env;
-
-        if (!THREADS_USERNAME || !THREADS_PASSWORD)
-            throw new Error('As credenciais do Threads não estão configuradas no .env');
-
-        threadsAPI = new ThreadsAPI({
-            username: THREADS_USERNAME,
-            password: THREADS_PASSWORD,
-            deviceID: THREADS_DEVICE_ID,
-        });
-
-        await threadsAPI.getUserIDfromUsername(THREADS_USERNAME);
-        Logger.info('Login no Threads realizado com sucesso.');
-    }
-    return threadsAPI;
-}
 
 interface ThreadsPostOptions {
     text?: string;
@@ -37,48 +15,85 @@ interface ThreadsPostOptions {
 }
 
 export async function handleThreadsPost(options: ThreadsPostOptions) {
-    const { text, images, tags } = options;
+    if (true)
+        throw new Error('O suporte ao Threads está temporariamente desativado devido a mudanças na API da Meta.');
 
-    if (!text && (!images || images.length === 0))
-        throw new Error('É necessário fornecer texto ou imagens.');
+    const { text, images, tags } = options;
+    const hasText = text && text.trim().length > 0;
+    const hasImages = images && images.length > 0;
+
+    if (!hasText && !hasImages)
+        throw new Error('É necessário fornecer texto ou imagens para o Threads.');
+
+    const { THREADS_ACCESS_TOKEN, THREADS_USER_ID } = process.env;
+    if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID)
+        throw new Error('Credenciais da Threads Graph API não configuradas no .env');
+
+    const client = new ThreadsAuthenticatedApiClient(THREADS_ACCESS_TOKEN, THREADS_USER_ID);
+    //const firstTag = tags && tags.length > 0 ? tags[0].replace(/ /g, '') : undefined;
 
     try {
-        const client = await getAuthenticatedClient();
-        let finalText = text || '';
-        if (tags && tags.length > 0) {
-            const firstTag = tags[0].replace(/ /g, '');
-            finalText = finalText ? `${finalText}\n\n${firstTag}` : firstTag;
+        let creationId: string;
+
+        if (!hasImages) {
+            Logger.info('[Threads] Criando post de texto...');
+            const response = await client.createMediaContainer({
+                mediaType: 'TEXT',
+                text: text!,
+                //topicTag: firstTag,
+            });
+            creationId = response.id;
+
+        } else {
+            Logger.info(`[Threads] Fazendo upload de ${images.length} imagem(ns) para o Cloudinary...`);
+            const imageUrls = await Promise.all(images.map(base64 => uploadImage(base64)));
+
+            if (imageUrls.length === 1) {
+                Logger.info('[Threads] Criando post de imagem única...');
+                const response = await client.createMediaContainer({
+                    mediaType: 'IMAGE',
+                    text: text,
+                    imageUrl: imageUrls[0],
+                    //topicTag: firstTag,
+                });
+                creationId = response.id;
+
+            } else {
+                Logger.info('[Threads] Criando contêineres de itens para o carrossel...');
+                const itemContainerIds = await Promise.all(
+                    imageUrls.map(url =>
+                        client.createMediaContainer({
+                            mediaType: 'IMAGE',
+                            imageUrl: url,
+                            isCarouselItem: true,
+                        }).then(res => res.id)
+                    )
+                );
+
+                Logger.info(`[Threads] IDs dos itens do carrossel: ${itemContainerIds.join(', ')}`);
+                Logger.info('[Threads] Criando contêiner principal do carrossel...');
+                const carouselContainer = await client.createMediaContainer({
+                    mediaType: 'CAROUSEL',
+                    text: text,
+                    children: itemContainerIds,
+                    //topicTag: firstTag,
+                });
+                creationId = carouselContainer.id;
+            }
         }
 
-        const publishOptions: { text: string; attachment?: any } = { text: finalText };
+        Logger.info(`[Threads] Publicando contêiner com ID: ${creationId}...`);
+        const { id: postId } = await client.publish({ creationId });
 
-        if (images && images.length > 0) {
-            Logger.info('Processando imagens para o Threads...');
-            const imageAttachments = images.map((imageDataUrl: string) => {
-                const parsedImage = parseDataUrl(imageDataUrl);
-                if (!parsedImage) {
-                    Logger.warn('Formato de imagem base64 inválido. Pulando imagem.');
-                    return null;
-                }
-                const extension = parsedImage.mimeType.split('/')[1] || 'jpg';
-                return {
-                    type: `.${extension}`,
-                    data: Buffer.from(parsedImage.data, 'base64'),
-                };
-            }).filter(Boolean);
-
-            if (imageAttachments.length === 1)
-                publishOptions.attachment = { image: imageAttachments[0] };
-            else if (imageAttachments.length > 1)
-                publishOptions.attachment = { sidecar: imageAttachments };
-        }
-
-        Logger.info('Enviando o post para o Threads...');
-        const postID = await client.publish(publishOptions);
-
-        Logger.info(`Post criado com sucesso no Threads! ID: ${postID}`);
-        return { success: true, data: { postID } };
+        Logger.info(`Post criado com sucesso no Threads! ID: ${postId}`);
+        return { success: true, data: { postId } };
     } catch (error) {
+        if (error instanceof ThreadsApiError) {
+            const apiError = error.getThreadsError();
+            Logger.error('[Threads] Erro da API do Threads:', error.message, apiError);
+            Sentry.captureException(error);
+            throw new Error(`Erro da API do Threads: ${apiError?.error?.message || error.message}`);
+        }
         Logger.error('Erro ao postar no Threads:', error);
         Sentry.captureException(error);
         throw error;

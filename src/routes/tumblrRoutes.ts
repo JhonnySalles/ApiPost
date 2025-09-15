@@ -68,42 +68,6 @@ interface TumblrPostOptions {
     tags?: string[];
 }
 
-async function sendImagesPhoto(options: TumblrPostOptions) {
-    const { blogName, text, images, tags } = options;
-    if (images && images.length > 0) {
-        const postOptions: any = {
-            tags: tags ? tags.join(',') : undefined,
-        };
-
-        const contentBlocks: any[] = [];
-        if (text)
-            contentBlocks.push({ type: 'text', text: text });
-
-        if (images && images.length > 0) {
-            Logger.info('Preparando post de FOTO para o Tumblr (método legado)...');
-            postOptions.type = 'photo';
-            postOptions.caption = text;
-
-            const imageBuffers = images.map((imageDataUrl: string) => {
-                const parsedImage = parseDataUrl(imageDataUrl);
-                return parsedImage ? Buffer.from(parsedImage.data, 'base64') : null;
-            })
-                .filter(Boolean);
-
-            postOptions.data = imageBuffers;
-        } else if (text) {
-            Logger.info('Preparando post de TEXTO para o Tumblr (método legado)...');
-            postOptions.type = 'text';
-            postOptions.title = tags && tags.length > 0 ? tags[0] : '';
-            postOptions.body = text;
-        }
-
-        const responseData = await new Promise((resolve, reject) => {
-            tumblrClient.createLegacyPost(blogName, postOptions, (err, data) => (err ? reject(err) : resolve(data)));
-        });
-    }
-}
-
 export async function handleTumblrPost(options: TumblrPostOptions) {
     const { blogName, text, images, tags } = options;
 
