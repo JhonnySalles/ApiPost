@@ -6,6 +6,7 @@ import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
+import { NpfLayoutBlock } from 'tumblr.js/types/types';
 
 const router = Router();
 
@@ -67,6 +68,42 @@ interface TumblrPostOptions {
     tags?: string[];
 }
 
+async function sendImagesPhoto(options: TumblrPostOptions) {
+    const { blogName, text, images, tags } = options;
+    if (images && images.length > 0) {
+        const postOptions: any = {
+            tags: tags ? tags.join(',') : undefined,
+        };
+
+        const contentBlocks: any[] = [];
+        if (text)
+            contentBlocks.push({ type: 'text', text: text });
+
+        if (images && images.length > 0) {
+            Logger.info('Preparando post de FOTO para o Tumblr (método legado)...');
+            postOptions.type = 'photo';
+            postOptions.caption = text;
+
+            const imageBuffers = images.map((imageDataUrl: string) => {
+                const parsedImage = parseDataUrl(imageDataUrl);
+                return parsedImage ? Buffer.from(parsedImage.data, 'base64') : null;
+            })
+                .filter(Boolean);
+
+            postOptions.data = imageBuffers;
+        } else if (text) {
+            Logger.info('Preparando post de TEXTO para o Tumblr (método legado)...');
+            postOptions.type = 'text';
+            postOptions.title = tags && tags.length > 0 ? tags[0] : '';
+            postOptions.body = text;
+        }
+
+        const responseData = await new Promise((resolve, reject) => {
+            tumblrClient.createLegacyPost(blogName, postOptions, (err, data) => (err ? reject(err) : resolve(data)));
+        });
+    }
+}
+
 export async function handleTumblrPost(options: TumblrPostOptions) {
     const { blogName, text, images, tags } = options;
 
@@ -77,40 +114,30 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
         throw new Error('É necessário fornecer texto ou imagens.');
 
     try {
-        let responseData;
+        const contentBlocks: any[] = [];
+
+        if (text)
+            contentBlocks.push({ type: 'text', text: text });
 
         if (images && images.length > 0) {
-            const postOptions: any = {
-                tags: tags ? tags.join(',') : undefined,
-            };
-
-            if (images && images.length > 0) {
-                Logger.info('Preparando post de FOTO para o Tumblr (método legado)...');
-                postOptions.type = 'photo';
-                postOptions.caption = text;
-
-                const imageBuffers = images.map((imageDataUrl: string) => {
-                    const parsedImage = parseDataUrl(imageDataUrl);
-                    return parsedImage ? Buffer.from(parsedImage.data, 'base64') : null;
-                })
-                    .filter(Boolean);
-
-                postOptions.data = imageBuffers;
-            } else if (text) {
-                Logger.info('Preparando post de TEXTO para o Tumblr (método legado)...');
-                postOptions.type = 'text';
-                postOptions.title = tags && tags.length > 0 ? tags[0] : '';
-                postOptions.body = text;
+            for (const [index, imageDataUrl] of images.entries()) {
+                const parsedImage = parseDataUrl(imageDataUrl);
+                if (parsedImage) {
+                    const imageBuffer = Buffer.from(parsedImage.data, 'base64');
+                    contentBlocks.push({
+                        type: 'image',
+                        media: imageBuffer,
+                        alt_text: text || 'Imagem enviada via apiPost',
+                    });
+                }
             }
-
-            responseData = await new Promise((resolve, reject) => {
-                tumblrClient.createLegacyPost(blogName, postOptions, (err, data) => (err ? reject(err) : resolve(data)));
-            });
-        } else {
-            const contentBlocks: any[] = [];
-            contentBlocks.push({ type: 'text', text: text });
-            responseData = await tumblrClient.createPost(blogName, { content: contentBlocks, tags: tags, });
         }
+
+        const responseData = await tumblrClient.createPost(blogName, {
+            content: contentBlocks,
+            tags: tags,
+        });
+
         Logger.info(`Post criado no Tumblr com sucesso para o blog ${blogName}`);
         return { success: true, data: responseData };
     } catch (error) {

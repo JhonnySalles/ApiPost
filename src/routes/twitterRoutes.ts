@@ -61,10 +61,10 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
             Logger.info(`Upload de ${mediaIds.length} imagem(ns) concluído.`);
         }
 
-        let finalText = text;
+        let finalText = text || '';
         if (tags && tags.length > 0) {
-            const hashtags = tags.map(tag => `#${tag}`).join(' ');
-            finalText = `${text}\n\n${hashtags}`;
+            const hashtags = tags.map(tag => `#${tag.replace(/ /g, '')}`).join(' ');
+            finalText = finalText ? `${finalText}\n\n${hashtags}` : hashtags;
         }
 
         Logger.info('Enviando o tweet...');

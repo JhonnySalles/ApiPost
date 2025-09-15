@@ -5,12 +5,15 @@ import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
+import sharp from 'sharp';
 
 const router = Router();
 
 const agent = new BskyAgent({
     service: 'https://bsky.social',
 });
+
+const BLUESKY_MAX_IMAGE_SIZE_BYTES = 976 * 1024;
 
 async function ensureAuthenticatedAgent() {
     if (!agent.hasSession) {
@@ -46,23 +49,38 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
     try {
         await ensureAuthenticatedAgent();
 
-        let finalText = text;
+        let finalText = text || '';
         if (tags && tags.length > 0) {
-            const hashtags = tags.map(tag => `#${tag}`).join(' ');
-            finalText = `${text}\n\n${hashtags}`;
+            const hashtags = tags.map(tag => `#${tag.replace(/ /g, '')}`).join(' ');
+            finalText = finalText ? `${finalText}\n\n${hashtags}` : hashtags;
         }
 
         const postEmbeds = [];
 
         if (images && images.length > 0) {
-            Logger.info('Fazendo upload de imagens para o Bluesky...');
+            Logger.info('Fazendo upload de imagens para o Bluesky, com otimização...');
             for (const imageDataUrl of images) {
                 const parsedImage = parseDataUrl(imageDataUrl);
                 if (!parsedImage) {
                     Logger.warn('Formato de imagem base64 inválido (Data URL esperado). Pulando imagem.');
                     continue;
                 }
-                const imageBuffer = Buffer.from(parsedImage.data, 'base64');
+
+                let imageBuffer: Buffer<ArrayBufferLike> = Buffer.from(parsedImage.data, 'base64');
+
+                if (imageBuffer.length > BLUESKY_MAX_IMAGE_SIZE_BYTES) {
+                    Logger.warn(`Imagem muito grande (${(imageBuffer.length / 1024).toFixed(2)}KB). Otimizando...`);
+
+                    imageBuffer = await sharp(imageBuffer)
+                        .resize(1080, null, { withoutEnlargement: true })
+                        .jpeg({ quality: 80, progressive: true, force: false })
+                        .png({ quality: 80, force: false })
+                        .webp({ quality: 80, force: false })
+                        .toBuffer();
+
+                    Logger.info(`Imagem otimizada para ${(imageBuffer.length / 1024).toFixed(2)}KB.`);
+                }
+
                 const uploadedImage = await agent.uploadBlob(imageBuffer, {
                     encoding: parsedImage.mimeType,
                 });

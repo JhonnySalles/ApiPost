@@ -13,7 +13,7 @@ let threadsAPI: ThreadsAPI | undefined;
 async function getAuthenticatedClient(): Promise<ThreadsAPI> {
     if (!threadsAPI) {
         Logger.info('Cliente do Threads não encontrado. Inicializando e realizando login...');
-        const { THREADS_USERNAME, THREADS_PASSWORD } = process.env;
+        const { THREADS_USERNAME, THREADS_PASSWORD, THREADS_DEVICE_ID } = process.env;
 
         if (!THREADS_USERNAME || !THREADS_PASSWORD)
             throw new Error('As credenciais do Threads não estão configuradas no .env');
@@ -21,6 +21,7 @@ async function getAuthenticatedClient(): Promise<ThreadsAPI> {
         threadsAPI = new ThreadsAPI({
             username: THREADS_USERNAME,
             password: THREADS_PASSWORD,
+            deviceID: THREADS_DEVICE_ID,
         });
 
         await threadsAPI.getUserIDfromUsername(THREADS_USERNAME);
@@ -44,8 +45,10 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
     try {
         const client = await getAuthenticatedClient();
         let finalText = text || '';
-        if (tags && tags.length > 0)
-            finalText = `${text}\n\n#${tags[0]}`;
+        if (tags && tags.length > 0) {
+            const firstTag = tags[0].replace(/ /g, '');
+            finalText = finalText ? `${finalText}\n\n${firstTag}` : firstTag;
+        }
 
         const publishOptions: { text: string; attachment?: any } = { text: finalText };
 

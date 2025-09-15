@@ -1,0 +1,25 @@
+diff --git a/node_modules/tumblr.js/lib/tumblr.js b/node_modules/tumblr.js/lib/tumblr.js
+index 49b3f1a..d44a56a 100644
+--- a/node_modules/tumblr.js/lib/tumblr.js
++++ b/node_modules/tumblr.js/lib/tumblr.js
+@@ -282,7 +282,10 @@ class Client {
+             continue;
+           }
+ 
+-          form.append(key, value);
++          if (value instanceof Buffer)
++            form.append(key, value, { filename: `${key}.jpg` });
++          else
++            form.append(key, value);
+         }
+ 
+         for (const [key, value] of Object.entries(form.getHeaders())) {
+@@ -523,7 +526,7 @@ class Client {
+     const mediaStreams = new Map();
+ 
+     const transformedContent = content.map((block, index) => {
+-      if (block.media && block.media instanceof ReadStream) {
++      if (block.media && block.media instanceof ReadStream || block.media instanceof Buffer) {
+         mediaStreams.set(String(index), block.media);
+         return {
+           ...block,
