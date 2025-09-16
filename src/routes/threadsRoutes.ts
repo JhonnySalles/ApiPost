@@ -18,7 +18,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
     if (true)
         throw new Error('O suporte ao Threads está temporariamente desativado devido a mudanças na API da Meta.');
 
-    const { text, images, tags } = options;
+    /*const { text, images, tags } = options;
     const hasText = text && text.trim().length > 0;
     const hasImages = images && images.length > 0;
 
@@ -97,7 +97,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         Logger.error('Erro ao postar no Threads:', error);
         Sentry.captureException(error);
         throw error;
-    }
+    }*/
 }
 
 /**
@@ -131,7 +131,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
 router.post('/post', protect, async (req: Request, res: Response) => {
     try {
         const result = await handleThreadsPost(req.body);
-        res.status(201).json({ message: 'Post criado com sucesso!', ...result });
+        res.status(201).json({ message: 'Threads desativado temporariamente.' }); //.json({ message: 'Post criado com sucesso!', ...result });
     } catch (error: any) {
         res.status(500).json({ message: error.message || 'Erro ao postar no Threads.' });
     }
