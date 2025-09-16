@@ -7,6 +7,8 @@ RUN apk add --no-cache vips-dev
 
 COPY package.json yarn.lock ./
 
+COPY patches ./patches
+
 # Instala TODAS as dependências. O script 'postinstall' rodará aqui,
 # aplicando o patch do tumblr.js na pasta node_modules deste estágio.
 RUN yarn install
@@ -27,6 +29,7 @@ RUN apk add --no-cache vips
 
 # Copia os arquivos de definição de pacotes
 COPY package.json yarn.lock ./
+COPY patches ./patches
 
 # ==================================================================
 # MUDANÇA PRINCIPAL
