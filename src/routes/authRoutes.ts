@@ -1,5 +1,4 @@
 // src/routes/authRoutes.ts
-
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import Logger from '../config/logger';

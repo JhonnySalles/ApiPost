@@ -1,6 +1,6 @@
 // src/server.ts
-import dotenv from 'dotenv';
-dotenv.config();
+import { loadSecrets } from './config/secrets';
+loadSecrets();
 
 import express, { Request, Response, NextFunction } from 'express';
 import http from 'http';

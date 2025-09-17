@@ -1,12 +1,10 @@
 // src/routes/tumblrRoutes.ts
 import { Router, Request, Response } from 'express';
 import tumblr from 'tumblr.js';
-import { Readable } from 'stream';
 import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
-import { NpfLayoutBlock } from 'tumblr.js/types/types';
 
 const router = Router();
 
@@ -91,7 +89,6 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
                     contentBlocks.push({
                         type: 'image',
                         media: imageBuffer,
-                        alt_text: text || 'Imagem enviada via apiPost',
                     });
                 }
             }
