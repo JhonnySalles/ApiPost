@@ -27,7 +27,27 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         throw new Error('Credenciais da Threads Graph API não configuradas no .env');
 
     const client = new ThreadsAuthenticatedApiClient(THREADS_ACCESS_TOKEN, THREADS_USER_ID);
-    //const firstTag = tags && tags.length > 0 ? tags[0].replace(/ /g, '') : undefined;
+
+    let topicTag: string | undefined = undefined;
+    const firstTag = tags && tags.length > 0 ? tags[0] : undefined;
+
+    if (firstTag) {
+        let cleanedTag = firstTag.replace(/[.&@!?,;:]/g, '');
+        const isNumeric = cleanedTag.trim() && !isNaN(Number(cleanedTag.replace(/ /g, '')));
+
+        if (cleanedTag.trim() && !isNumeric) {
+            if (cleanedTag.length > 50) {
+                const truncated = cleanedTag.substring(0, 50);
+                const lastSpaceIndex = truncated.lastIndexOf(' ');
+                if (lastSpaceIndex > 0)
+                    topicTag = truncated.substring(0, lastSpaceIndex);
+                else
+                    topicTag = truncated;
+            } else
+                topicTag = cleanedTag;
+            topicTag = topicTag.trim();
+        }
+    }
 
     try {
         let creationId: string;
@@ -37,7 +57,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
             const response = await client.createMediaContainer({
                 mediaType: 'TEXT',
                 text: text!,
-                //topicTag: firstTag,
+                topicTag: topicTag,
             });
             creationId = response.id;
 
@@ -51,7 +71,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
                     mediaType: 'IMAGE',
                     text: text,
                     imageUrl: imageUrls[0],
-                    //topicTag: firstTag,
+                    topicTag: topicTag,
                 });
                 creationId = response.id;
 
@@ -73,7 +93,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
                     mediaType: 'CAROUSEL',
                     text: text,
                     children: itemContainerIds,
-                    //topicTag: firstTag,
+                    topicTag: topicTag,
                 });
                 creationId = carouselContainer.id;
             }

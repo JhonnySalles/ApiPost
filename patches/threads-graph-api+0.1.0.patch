@@ -1,5 +1,5 @@
 diff --git a/node_modules/threads-graph-api/dist/src/api-client.js b/node_modules/threads-graph-api/dist/src/api-client.js
-index adfd559..f4b2852 100644
+index adfd559..1e81159 100644
 --- a/node_modules/threads-graph-api/dist/src/api-client.js
 +++ b/node_modules/threads-graph-api/dist/src/api-client.js
 @@ -71,7 +71,7 @@ var __rest = (this && this.__rest) || function (s, e) {
@@ -11,6 +11,15 @@ index adfd559..f4b2852 100644
  var ThreadsApiError = /** @class */ (function (_super) {
      __extends(ThreadsApiError, _super);
      function ThreadsApiError(error) {
+@@ -220,7 +220,7 @@ var ThreadsAuthenticatedApiClient = /** @class */ (function (_super) {
+     ThreadsAuthenticatedApiClient.prototype.createMediaContainer = function (params) {
+         return __awaiter(this, void 0, void 0, function () {
+             return __generator(this, function (_a) {
+-                return [2 /*return*/, this._authenticatedPost('/v1.0/me/threads', __assign(__assign(__assign({ media_type: params.mediaType, text: params.text, reply_control: params.replyControl, reply_to_id: params.replyToId }, (params.mediaType === 'IMAGE' && {
++                return [2 /*return*/, this._authenticatedPost('/v1.0/me/threads', __assign(__assign(__assign({ media_type: params.mediaType, text: params.text, reply_control: params.replyControl, reply_to_id: params.replyToId, topic_tag: params.topicTag }, (params.mediaType === 'IMAGE' && {
+                         image_url: params.imageUrl,
+                         is_carousel_item: params.isCarouselItem,
+                     })), (params.mediaType === 'VIDEO' && {
 diff --git a/node_modules/threads-graph-api/dist/src/index.js b/node_modules/threads-graph-api/dist/src/index.js
 index 671fb77..92d3d80 100644
 --- a/node_modules/threads-graph-api/dist/src/index.js
@@ -20,3 +29,38 @@ index 671fb77..92d3d80 100644
 -export * from './types';
 +export * from './api-client.js';
 +export * from './types.js';
+diff --git a/node_modules/threads-graph-api/dist/src/types.d.ts b/node_modules/threads-graph-api/dist/src/types.d.ts
+index 831b73b..66c0b81 100644
+--- a/node_modules/threads-graph-api/dist/src/types.d.ts
++++ b/node_modules/threads-graph-api/dist/src/types.d.ts
+@@ -73,20 +73,24 @@ export type CreateMediaContainerParams = {
+ } & ({
+     mediaType: 'TEXT';
+     text: string;
++    topicTag?: string;
+ } | {
+     mediaType: 'IMAGE';
+     imageUrl: string;
+     isCarouselItem?: boolean;
+     text?: string;
++    topicTag?: string;
+ } | {
+     mediaType: 'VIDEO';
+     videoUrl: string;
+     isCarouselItem?: boolean;
+     text?: string;
++    topicTag?: string;
+ } | {
+     mediaType: 'CAROUSEL';
+     children: string[];
+     text?: string;
++    topicTag?: string;
+ });
+ export declare const CreateMediaContainerResponseSchema: z.ZodObject<{
+     id: z.ZodString;
+@@ -976,4 +980,4 @@ export declare const GetAccountMetricsResponseSchema: z.ZodObject<{
+     }[];
+ }>;
+ export type GetAccountMetricsResponse = z.infer<typeof GetAccountMetricsResponseSchema>;
+-export {};
++export { };
