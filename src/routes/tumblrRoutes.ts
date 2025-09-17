@@ -53,7 +53,7 @@ router.get('/blogs', protect, async (req: Request, res: Response) => {
         Logger.info('Lista de blogs do Tumblr foi solicitada e retornada com sucesso.');
         res.status(200).json({ blogs });
     } catch (error) {
-        Logger.error('Erro ao buscar blogs do Tumblr:', error);
+        Logger.error('Erro ao buscar blogs do Tumblr: %o', error);
         Sentry.captureException(error);
         res.status(500).json({ message: 'Erro ao buscar blogs do Tumblr.' });
     }
@@ -102,7 +102,7 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
         Logger.info(`Post criado no Tumblr com sucesso para o blog ${blogName}`);
         return { success: true, data: responseData };
     } catch (error) {
-        Logger.error(`Erro ao postar no Tumblr no blog ${blogName}:`, error);
+        Logger.error(`Erro ao postar no Tumblr no blog ${blogName}: %o`, error);
         Sentry.captureException(error, { extra: { blogName } });
         throw error;
     }

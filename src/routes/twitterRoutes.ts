@@ -76,7 +76,7 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
         Logger.info(`Tweet criado com sucesso! ID: ${tweetResult.data.id}`);
         return { success: true, data: tweetResult.data };
     } catch (error) {
-        Logger.error('Erro ao postar no Twitter:', error);
+        Logger.error('Erro ao postar no Twitter: %o', error);
         Sentry.captureException(error);
         throw error;
     }

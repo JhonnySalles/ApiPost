@@ -112,7 +112,7 @@ app.use('/threads', threadsRoutes);
 
 app.use(Sentry.expressErrorHandler());
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-    Logger.error('Erro não tratado capturado pelo handler final:', err.message || err);
+    Logger.error('Erro não tratado capturado pelo handler final: %o', err.message || err);
     res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
 });
 

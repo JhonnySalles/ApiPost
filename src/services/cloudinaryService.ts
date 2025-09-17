@@ -3,10 +3,10 @@ import { v2 as cloudinary } from 'cloudinary';
 import Logger from '../config/logger';
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true,
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true,
 });
 
 /**
@@ -15,13 +15,13 @@ cloudinary.config({
  * @returns A URL segura da imagem hospedada.
  */
 export async function uploadImage(base64Image: string): Promise<string> {
-  try {
-    const result = await cloudinary.uploader.upload(base64Image, {
-      folder: "api-post-uploads",
-    });
-    return result.secure_url;
-  } catch (error) {
-    Logger.error('Erro ao fazer upload para o Cloudinary:', error);
-    throw new Error('Falha no upload da imagem para o serviço de hospedagem.');
-  }
+    try {
+        const result = await cloudinary.uploader.upload(base64Image, {
+            folder: "api-post-uploads",
+        });
+        return result.secure_url;
+    } catch (error) {
+        Logger.error('Erro ao fazer upload para o Cloudinary: %o', error);
+        throw new Error('Falha no upload da imagem para o serviço de hospedagem.');
+    }
 }

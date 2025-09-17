@@ -36,7 +36,7 @@ export function loadSecrets() {
             flattenAndSetEnv(secrets);
             Logger.info('Segredos do JSON carregados com sucesso em process.env.');
         } catch (error) {
-            Logger.error('ERRO: Falha ao fazer o parse do JSON de segredos.', error);
+            Logger.error('ERRO: Falha ao fazer o parse do JSON de segredos:  %o', error);
         }
     } else {
         Logger.warn('Ambiente local detectado. Carregando segredos do arquivo .env.');

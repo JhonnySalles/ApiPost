@@ -1,11 +1,11 @@
-// setup-tumblr.ts
+// setup-tumblr.ts (versão corrigida)
 import tumblr from 'tumblr.js';
 import inquirer from 'inquirer';
-import util from 'util';
+import { URLSearchParams } from 'url';
 
-// Cole as chaves que você obteve do site do Tumblr aqui
 const TUMBLR_CONSUMER_KEY = 'SUA_CONSUMER_KEY_AQUI';
 const TUMBLR_CONSUMER_SECRET = 'SUA_SECRET_KEY_AQUI';
+const CALLBACK_URL = 'http://localhost/callback';
 
 const client = tumblr.createClient({
     consumer_key: TUMBLR_CONSUMER_KEY,
@@ -14,15 +14,26 @@ const client = tumblr.createClient({
     token_secret: '',
 });
 
-//const getOAuthRequestToken = util.promisify(client.getRequestToken.bind(client));
-
 async function run() {
     console.log('🚀 Iniciando processo de autorização do Tumblr...');
 
     try {
-        //const { oauth_token, oauth_token_secret, auth_url } = await getOAuthRequestToken('http://localhost/callback');
+        const responseString: string = await client.getRequest('/oauth/request_token', {
+            oauth_callback: CALLBACK_URL,
+        });
 
-        /*console.log('\n================================================================');
+        const responseParams = new URLSearchParams(responseString);
+        const oauth_token = responseParams.get('oauth_token');
+        const oauth_token_secret = responseParams.get('oauth_token_secret');
+
+        if (!oauth_token || !oauth_token_secret) {
+            throw new Error('Não foi possível obter o token de requisição do Tumblr.');
+        }
+        // ==================================================================
+
+        const auth_url = `https://www.tumblr.com/oauth/authorize?oauth_token=${oauth_token}`;
+
+        console.log('\n================================================================');
         console.log(' PASSO 1: Autorize a aplicação no seu navegador:');
         console.log(` 👉 Visite esta URL: ${auth_url}`);
         console.log('================================================================\n');
@@ -31,17 +42,24 @@ async function run() {
             {
                 type: 'input',
                 name: 'verifier',
-                message: 'Após autorizar, cole o código "verifier" que aparece na URL aqui:',
+                message: 'Após autorizar, cole o código "oauth_verifier" que aparece na URL aqui:',
             },
         ]);
 
-        const getOAuthAccessToken = util.promisify(client.getAccessToken.bind(client));
+        // A função getAccessToken provavelmente também foi removida, então usamos o método genérico.
+        const accessTokenString: string = await client.getRequest('/oauth/access_token', {
+            oauth_consumer_key: TUMBLR_CONSUMER_KEY,
+            oauth_token: oauth_token,
+            oauth_verifier: verifier.trim(),
+        });
 
-        const { oauth_token: accessToken, oauth_token_secret: accessTokenSecret } = await getOAuthAccessToken(
-            oauth_token,
-            oauth_token_secret,
-            verifier.trim()
-        );
+        const accessTokenParams = new URLSearchParams(accessTokenString);
+        const accessToken = accessTokenParams.get('oauth_token');
+        const accessTokenSecret = accessTokenParams.get('oauth_token_secret');
+
+        if (!accessToken || !accessTokenSecret) {
+            throw new Error('Não foi possível obter o token de acesso final do Tumblr.');
+        }
 
         console.log('\n✅ Autorização concluída com sucesso!');
         console.log('\nCopie as linhas abaixo e adicione ao seu arquivo .env:\n');
@@ -50,7 +68,7 @@ async function run() {
         console.log(`TUMBLR_CONSUMER_SECRET="${TUMBLR_CONSUMER_SECRET}"`);
         console.log(`TUMBLR_ACCESS_TOKEN="${accessToken}"`);
         console.log(`TUMBLR_ACCESS_TOKEN_SECRET="${accessTokenSecret}"`);
-        console.log('----------------------------------------------------');*/
+        console.log('----------------------------------------------------');
 
     } catch (error) {
         console.error('❌ Ocorreu um erro durante a autorização:', error);

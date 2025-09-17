@@ -18,7 +18,7 @@ export const protect = (req: Request, res: Response, next: NextFunction) => {
         jwt.verify(token, JWT_SECRET);
         next();
     } catch (error) {
-        Logger.error('Falha na verificação do token JWT.', error);
+        Logger.error('Falha na verificação do token JWT: %o', error);
         return res.status(401).json({ message: 'Não autorizado, token inválido.' });
     }
 };

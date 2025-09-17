@@ -78,7 +78,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
             status = 'error';
             errorDetails = error.message || 'Erro desconhecido';
             failedPlatforms.push({ platform, reason: errorDetails || 'Erro desconhecido' });
-            Logger.error(`[Publish All] Falha ao postar em ${platform}:`, error);
+            Logger.error(`[Publish All] Falha ao postar em ${platform}: %o`, error);
             Sentry.captureException(error, { extra: { platform } });
         }
 

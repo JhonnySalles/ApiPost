@@ -111,7 +111,7 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
         Logger.info(`Post criado com sucesso no Bluesky! URI: ${postResult.uri}`);
         return { success: true, data: postResult };
     } catch (error) {
-        Logger.error('Erro ao postar no Bluesky:', error);
+        Logger.error('Erro ao postar no Bluesky: %o', error);
         Sentry.captureException(error);
         throw error;
     }

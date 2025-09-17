@@ -58,7 +58,7 @@ router.post('/login', (req: Request, res: Response) => {
         const isCredentialsValid = username === API_USER && password === API_PASSWORD;
         const isAccessTokenValid = accessToken === API_ACCESS_TOKEN;
 
-        console.log(`Credenciais válidas: ${isCredentialsValid}, Token de acesso válido: ${isAccessTokenValid}`);
+        Logger.info(`Credenciais válidas: ${isCredentialsValid}, Token de acesso válido: ${isAccessTokenValid}`);
 
         if (!isCredentialsValid || !isAccessTokenValid)
             return res.status(401).json({ message: 'Credenciais inválidas.' });
@@ -70,7 +70,7 @@ router.post('/login', (req: Request, res: Response) => {
         res.status(200).json({ message: 'Autenticação bem-sucedida!', token: token, expiration: expirationDate.toISOString(), });
     } catch (error) {
         Sentry.captureException(error);
-        Logger.error('Erro inesperado no endpoint /login:', error);
+        Logger.error('Erro inesperado no endpoint /login: %o', error);
         res.status(500).json({ message: 'Erro interno no servidor.' });
     }
 });
@@ -124,7 +124,7 @@ router.post('/token/refresh', (req: Request, res: Response) => {
         });
     } catch (error) {
         Sentry.captureException(error);
-        Logger.error('Erro inesperado no endpoint /token/refresh:', error);
+        Logger.error('Erro inesperado no endpoint /token/refresh: %o', error);
         res.status(500).json({ message: 'Erro interno no servidor.' });
     }
 });
