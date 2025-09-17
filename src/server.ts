@@ -107,6 +107,7 @@ app.use('/auth', authRoutes);
 app.use('/publish-all', publishAllRoutes);
 app.use('/tumblr', tumblrRoutes);
 app.use('/twitter', twitterRoutes);
+app.use('/x', twitterRoutes);
 app.use('/bluesky', blueskyRoutes);
 app.use('/threads', threadsRoutes);
 

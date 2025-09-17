@@ -19,10 +19,10 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
     const { text, images, tags } = options;
 
     if (!text && (!images || images.length === 0))
-        throw new Error('É necessário fornecer texto ou imagens.');
+        throw new Error('Twitter: É necessário fornecer texto ou imagens.');
 
     if (images && images.length > 4)
-        throw new Error('É permitido no máximo 4 imagens por tweet.');
+        throw new Error('Twitter: É permitido no máximo 4 imagens por tweet.');
 
     const {
         TWITTER_APP_KEY,
@@ -32,7 +32,7 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
     } = process.env;
 
     if (!TWITTER_APP_KEY || !TWITTER_APP_SECRET || !TWITTER_ACCESS_TOKEN || !TWITTER_ACCESS_SECRET)
-        throw new Error('As 4 chaves do Twitter (OAuth 1.0a) não estão configuradas no .env');
+        throw new Error('Twitter: As 4 chaves do Twitter (OAuth 1.0a) não estão configuradas no .env');
 
     try {
         const client = new TwitterApi({

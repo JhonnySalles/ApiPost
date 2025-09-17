@@ -70,10 +70,10 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
     const { blogName, text, images, tags } = options;
 
     if (!blogName)
-        throw new Error('O nome do blog (blogName) é obrigatório para o Tumblr.');
+        throw new Error(`Tumblr: O nome do blog (blogName) é obrigatório para o Tumblr.`);
 
     if (!text && (!images || images.length === 0))
-        throw new Error('É necessário fornecer texto ou imagens.');
+        throw new Error(`Tumblr: É necessário fornecer texto ou imagens.`);
 
     try {
         const contentBlocks: any[] = [];

@@ -14,11 +14,11 @@ const router = Router();
 
 interface ImagePayload {
     base64: string;
-    platforms?: ('tumblr' | 'x' | 'bluesky' | 'threads')[];
+    platforms?: ('tumblr' | 'x' | 'twitter' | 'bluesky' | 'threads')[];
 }
 
 interface PublishAllPayload {
-    platforms: ('tumblr' | 'x' | 'bluesky' | 'threads')[];
+    platforms: ('tumblr' | 'x' | 'twitter' | 'bluesky' | 'threads')[];
     text?: string;
     images?: ImagePayload[];
     tags?: string[];
@@ -57,6 +57,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                     await handleTumblrPost({ text, images: imagesPost, tags, ...platformOptions.tumblr });
                     break;
                 case 'x':
+                case 'twitter':
                     const listX = imagesPost && imagesPost.length > 4 ? imagesPost.slice(0, 4) : imagesPost;
                     await handleTwitterPost({ text: text || '', images: listX, tags });
                     break;

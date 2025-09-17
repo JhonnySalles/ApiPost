@@ -41,10 +41,10 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
     const { text, images, tags } = options;
 
     if (!text && (!images || images.length === 0))
-        throw new Error('É necessário fornecer texto ou imagens.');
+        throw new Error('Bluesky: É necessário fornecer texto ou imagens.');
 
     if (images && images.length > 4)
-        throw new Error('É permitido no máximo 4 imagens por post no Bluesky.');
+        throw new Error('Bluesky: É permitido no máximo 4 imagens por post no Bluesky.');
 
     try {
         await ensureAuthenticatedAgent();

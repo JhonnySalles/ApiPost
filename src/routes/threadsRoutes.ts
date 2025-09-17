@@ -20,11 +20,11 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
     const hasImages = images && images.length > 0;
 
     if (!hasText && !hasImages)
-        throw new Error('É necessário fornecer texto ou imagens para o Threads.');
+        throw new Error('Threads: É necessário fornecer texto ou imagens para o Threads.');
 
     const { THREADS_ACCESS_TOKEN, THREADS_USER_ID } = process.env;
     if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID)
-        throw new Error('Credenciais da Threads Graph API não configuradas no .env');
+        throw new Error('Threads: Credenciais da Threads Graph API não configuradas no .env');
 
     const client = new ThreadsAuthenticatedApiClient(THREADS_ACCESS_TOKEN, THREADS_USER_ID);
 
