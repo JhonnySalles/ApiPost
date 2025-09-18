@@ -51,12 +51,11 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
 
     try {
         let creationId: string;
-
         if (!hasImages) {
             Logger.info('[Threads] Criando post de texto...');
             const response = await client.createMediaContainer({
                 mediaType: 'TEXT',
-                text: text!,
+                text: (text || "").replace("\t", ""),
                 topicTag: topicTag,
             });
             creationId = response.id;
@@ -64,17 +63,17 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         } else {
             Logger.info(`[Threads] Fazendo upload de ${images.length} imagem(ns) para o Cloudinary...`);
             const imageUrls = await Promise.all(images.map(base64 => uploadImage(base64)));
+            //Logger.info(`[Threads] Imagens enviadas com sucesso para o Cloudinary, links: ${imageUrls.join(', ')}`);
 
             if (imageUrls.length === 1) {
                 Logger.info('[Threads] Criando post de imagem única...');
                 const response = await client.createMediaContainer({
                     mediaType: 'IMAGE',
-                    text: text,
+                    text: text ? text.replace("\t", "") : undefined,
                     imageUrl: imageUrls[0],
                     topicTag: topicTag,
                 });
                 creationId = response.id;
-
             } else {
                 Logger.info('[Threads] Criando contêineres de itens para o carrossel...');
                 const itemContainerIds = await Promise.all(
@@ -91,7 +90,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
                 Logger.info('[Threads] Criando contêiner principal do carrossel...');
                 const carouselContainer = await client.createMediaContainer({
                     mediaType: 'CAROUSEL',
-                    text: text,
+                    text: text ? text.replace("\t", "") : undefined,
                     children: itemContainerIds,
                     topicTag: topicTag,
                 });

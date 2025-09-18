@@ -30,14 +30,24 @@ async function run() {
             server.close();
 
             publicClient.exchangeAuthorizationCode(THREADS_CLIENT_ID, THREADS_CLIENT_SECRET, REDIRECT_URI, code)
-                .then(async (response) => {
-                    const { access_token, user_id } = response;
-                    console.log('\n✅ Autorização concluída com sucesso!');
-                    console.log('\nCopie as linhas abaixo e adicione ao seu arquivo .env:\n');
+                .then(async (shortLivedTokenResponse) => {
+                    const { access_token: shortLivedToken, user_id } = shortLivedTokenResponse;
+                    const longLivedTokenUrl = `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${THREADS_CLIENT_SECRET}&access_token=${shortLivedToken}`;
+
+                    const responseLong = await fetch(longLivedTokenUrl);
+                    const longLivedTokenData = await responseLong.json() as any;
+
+                    if (!longLivedTokenData.access_token) {
+                        throw new Error(`Falha ao obter o token de longa duração: ${JSON.stringify(longLivedTokenData)}`);
+                    }
+                    const longLivedToken = longLivedTokenData.access_token;
+
+                    console.log('\n✅ Autorização finalizada com sucesso!');
+                    console.log('\nSALVE ESTES VALORES! Este é o seu TOKEN DE LONGA DURAÇÃO (60 dias).\n');
                     console.log('----------------------------------------------------');
                     console.log(`THREADS_CLIENT_ID="${THREADS_CLIENT_ID}"`);
                     console.log(`THREADS_CLIENT_SECRET="${THREADS_CLIENT_SECRET}"`);
-                    console.log(`THREADS_ACCESS_TOKEN="${access_token}"`);
+                    console.log(`THREADS_ACCESS_TOKEN="${longLivedToken}"`);
                     console.log(`THREADS_USER_ID="${user_id}"`);
                     console.log('----------------------------------------------------');
                 })
