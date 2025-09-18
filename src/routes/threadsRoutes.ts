@@ -4,6 +4,7 @@ import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { uploadImage } from '../services/cloudinaryService';
+import { ThreadsApiError, ThreadsAuthenticatedApiClient } from '@libs/threads-graph-api/index.js';
 
 const router = Router();
 
@@ -25,31 +26,30 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
     if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID)
         throw new Error('Threads: Credenciais da Threads Graph API não configuradas no .env');
 
-    const { ThreadsAuthenticatedApiClient, ThreadsApiError } = await import('threads-graph-api');
-    const client = new ThreadsAuthenticatedApiClient(THREADS_ACCESS_TOKEN, THREADS_USER_ID);
-
-    let topicTag: string | undefined = undefined;
-    const firstTag = tags && tags.length > 0 ? tags[0] : undefined;
-
-    if (firstTag) {
-        let cleanedTag = firstTag.replace(/[.&@!?,;:]/g, '');
-        const isNumeric = cleanedTag.trim() && !isNaN(Number(cleanedTag.replace(/ /g, '')));
-
-        if (cleanedTag.trim() && !isNumeric) {
-            if (cleanedTag.length > 50) {
-                const truncated = cleanedTag.substring(0, 50);
-                const lastSpaceIndex = truncated.lastIndexOf(' ');
-                if (lastSpaceIndex > 0)
-                    topicTag = truncated.substring(0, lastSpaceIndex);
-                else
-                    topicTag = truncated;
-            } else
-                topicTag = cleanedTag;
-            topicTag = topicTag.trim();
-        }
-    }
-
     try {
+        const client = new ThreadsAuthenticatedApiClient(THREADS_ACCESS_TOKEN, THREADS_USER_ID);
+
+        let topicTag: string | undefined = undefined;
+        const firstTag = tags && tags.length > 0 ? tags[0] : undefined;
+
+        if (firstTag) {
+            let cleanedTag = firstTag.replace(/[.&@!?,;:]/g, '');
+            const isNumeric = cleanedTag.trim() && !isNaN(Number(cleanedTag.replace(/ /g, '')));
+
+            if (cleanedTag.trim() && !isNumeric) {
+                if (cleanedTag.length > 50) {
+                    const truncated = cleanedTag.substring(0, 50);
+                    const lastSpaceIndex = truncated.lastIndexOf(' ');
+                    if (lastSpaceIndex > 0)
+                        topicTag = truncated.substring(0, lastSpaceIndex);
+                    else
+                        topicTag = truncated;
+                } else
+                    topicTag = cleanedTag;
+                topicTag = topicTag.trim();
+            }
+        }
+
         let creationId: string;
         if (!hasImages) {
             Logger.info('[Threads] Criando post de texto...');

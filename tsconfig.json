@@ -11,7 +11,11 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": false,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": "./src",
+    "paths": {
+      "@libs/*": ["lib/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]

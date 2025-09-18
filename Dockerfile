@@ -45,5 +45,8 @@ COPY --from=builder /app/node_modules/tumblr.js ./node_modules/tumblr.js
 # Copia o código já compilado do estágio 'builder'
 COPY --from=builder /app/dist ./dist
 
+COPY --from=builder /app/src/lib ./src/lib
+COPY --from=builder /app/tsconfig.json ./
+
 EXPOSE 8080
-CMD ["node", "dist/server.js"]
+CMD ["node", "-r", "tsconfig-paths/register", "dist/server.js"]
