@@ -1,5 +1,5 @@
 # Estágio 1: Builder - Instala tudo, aplica patches e compila
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Adiciona dependências para o 'sharp'
@@ -21,7 +21,7 @@ RUN yarn build
 
 
 # Estágio 2: Production - Instala deps de prod e copia os artefatos prontos e corrigidos
-FROM node:18-alpine
+FROM node:22-alpine
 WORKDIR /app
 
 # Adiciona dependências para o 'sharp'
