@@ -1,6 +1,5 @@
 // src/routes/threadsRoutes.ts
 import { Router, Request, Response } from 'express';
-import { ThreadsAuthenticatedApiClient, ThreadsApiError } from 'threads-graph-api';
 import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
@@ -26,6 +25,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
     if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID)
         throw new Error('Threads: Credenciais da Threads Graph API não configuradas no .env');
 
+    const { ThreadsAuthenticatedApiClient, ThreadsApiError } = await import('threads-graph-api');
     const client = new ThreadsAuthenticatedApiClient(THREADS_ACCESS_TOKEN, THREADS_USER_ID);
 
     let topicTag: string | undefined = undefined;
