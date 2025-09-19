@@ -380,7 +380,7 @@ var ThreadsAuthenticatedApiClient = /** @class */ (function (_super) {
                     text: params.text,
                     reply_control: params.replyControl,
                     reply_to_id: params.replyToId,
-                    topic_tag: params.topicTag,
+                    topic_tag: params.topicTag ? params.topicTag : null,
                   },
                   params.mediaType === 'IMAGE' && {
                     image_url: params.imageUrl,

@@ -63,7 +63,6 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         } else {
             Logger.info(`[Threads] Fazendo upload de ${images.length} imagem(ns) para o Cloudinary...`);
             const imageUrls = await Promise.all(images.map(base64 => uploadImage(base64)));
-            //Logger.info(`[Threads] Imagens enviadas com sucesso para o Cloudinary, links: ${imageUrls.join(', ')}`);
 
             if (imageUrls.length === 1) {
                 Logger.info('[Threads] Criando post de imagem única...');
@@ -86,13 +85,11 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
                     )
                 );
 
-                Logger.info(`[Threads] IDs dos itens do carrossel: ${itemContainerIds.join(', ')}`);
                 Logger.info('[Threads] Criando contêiner principal do carrossel...');
                 const carouselContainer = await client.createMediaContainer({
                     mediaType: 'CAROUSEL',
                     text: text ? text.replace("\t", "") : undefined,
                     children: itemContainerIds,
-                    topicTag: topicTag,
                 });
                 creationId = carouselContainer.id;
             }
@@ -100,8 +97,6 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
 
         Logger.info(`[Threads] Publicando contêiner com ID: ${creationId}...`);
         const { id: postId } = await client.publish({ creationId });
-
-        Logger.info(`Post criado com sucesso no Threads! ID: ${postId}`);
         return { success: true, data: { postId } };
     } catch (error) {
         if (error instanceof ThreadsApiError) {
