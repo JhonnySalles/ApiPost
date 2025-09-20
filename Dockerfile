@@ -48,5 +48,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/lib ./src/lib
 COPY --from=builder /app/tsconfig.json ./
 
+COPY swagger-spec.yaml ./
+
 EXPOSE 8080
 CMD ["node", "-r", "tsconfig-paths/register", "dist/server.js"]

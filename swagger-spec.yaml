@@ -1,0 +1,387 @@
+openapi: 3.0.0
+info:
+  title: API de Postagem Social
+  version: 1.0.0
+  description: API para postar conteúdo em diversas redes sociais.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        accessToken:
+          type: string
+    RefreshTokenRequest:
+      type: object
+      properties:
+        accessToken:
+          type: string
+    ImagePayload:
+      type: object
+      properties:
+        base64:
+          type: string
+          format: byte
+        platforms:
+          type: array
+          items:
+            type: string
+            enum:
+              - tumblr
+              - twitter
+              - bluesky
+              - threads
+    SocialPostRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+            format: byte
+        tags:
+          type: array
+          items:
+            type: string
+paths:
+  /auth/login:
+    post:
+      summary: Autentica o usuário e retorna um token JWT.
+      tags:
+        - Autenticação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/SocialPostRequest"
+                - type: object
+                  properties:
+                    accessToken:
+                      type: string
+            example:
+              username: seu-usuario
+              password: sua-senha-forte
+              accessToken: um-token-secreto-e-longo
+      responses:
+        "200":
+          description: Login bem-sucedido.
+          content:
+            application/json:
+              example:
+                message: Autenticação bem-sucedida!
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                expiresAt: 2025-09-14T22:38:59.123Z
+        "401":
+          description: Credenciais inválidas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/token/refresh:
+    post:
+      summary: Renova um token JWT expirado.
+      tags:
+        - Autenticação
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/SocialPostRequest"
+                - type: object
+                  properties:
+                    accessToken:
+                      type: string
+            example:
+              accessToken: um-token-secreto-e-longo
+      responses:
+        "200":
+          description: Token renovado com sucesso.
+        "401":
+          description: Token inválido/ausente.
+  /bluesky/post:
+    post:
+      summary: Cria um novo post (skeet) no Bluesky.
+      tags:
+        - Bluesky
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/SocialPostRequest"
+                - type: object
+                  properties:
+                    text:
+                      type: string
+                    images:
+                      type: array
+                      items:
+                        type: base64
+                    tags:
+                      type: array
+                      items:
+                        type: string
+            example:
+              text: Este é um tweet de exemplo!
+              tags:
+                - api
+                - teste
+              images:
+                - data:image/png;base64,iVBORw0KGgo...
+      responses:
+        "201":
+          description: Post criado com sucesso.
+  /publish-all/post:
+    post:
+      summary: Posta em múltiplas plataformas de uma vez.
+      tags:
+        - Publish All
+      description: >
+        Inicia um processo em segundo plano para postar conteúdo em várias
+        plataformas.
+
+        O cliente deve primeiro conectar-se ao servidor via WebSocket para obter um `socketId`.
+
+        A API responde imediatamente com '202 Accepted'. O progresso e o resultado final são enviados através de eventos WebSocket para o `socketId` fornecido.
+
+        **Eventos WebSocket Emitidos pelo Servidor:**
+
+        1. `progressUpdate`: Enviado para cada plataforma processada.
+           `{ "type": "progress", "platform": "twitter", "status": "success", "progress": 50 }`
+        2. `taskCompleted`: Enviado ao final de todo o processo com um sumário.
+           `{ "type": "summary", "status": "completed", "summary": { ... } }`
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - tumblr
+                      - twitter
+                      - bluesky
+                      - threads
+                  example:
+                    - tumblr
+                    - twitter
+                    - bluesky
+                    - threads
+                text:
+                  type: string
+                  example: Olá, mundo!
+                images:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ImagePayload"
+                  example:
+                    - base64: data:image/jpeg;base64,...
+                      platforms:
+                        - twitter
+                    - base64: data:image/png;base64,...
+                      platforms:
+                        - tumblr
+                    - base64: data:image/gif;base64,...
+                      platforms:
+                        - twitter
+                        - tumblr
+                tags:
+                  type: array
+                  items:
+                    type: string
+                socketId:
+                  type: string
+                  description: O ID da conexão WebSocket do cliente.
+                platformOptions:
+                  type: object
+                  properties:
+                    tumblr:
+                      type: object
+                      properties:
+                        blogName:
+                          type: string
+                          example: meu-blog-principal
+      responses:
+        "202":
+          description: Processamento aceito e iniciado em segundo plano.
+  /threads/post:
+    post:
+      summary: Cria um novo post no Threads.
+      tags:
+        - Threads
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/SocialPostRequest"
+                - type: object
+                  properties:
+                    text:
+                      type: string
+                    images:
+                      type: array
+                      items:
+                        type: base64
+                    tags:
+                      type: array
+                      items:
+                        type: string
+            example:
+              text: Este é um tweet de exemplo!
+              tags:
+                - api
+                - teste
+              images:
+                - data:image/png;base64,iVBORw0KGgo...
+      responses:
+        "201":
+          description: Post criado com sucesso.
+  /tumblr/blogs:
+    get:
+      summary: Retorna a lista de blogs do usuário no Tumblr.
+      tags:
+        - Tumblr
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de blogs retornada com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blogs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          description: O identificador do blog, usado nas requisições de postagem.
+                          example: meu-blog-principal
+                        title:
+                          type: string
+                          description: O título de exibição do blog.
+                          example: O Blog Incrível de Testes
+  /tumblr/post:
+    post:
+      summary: Cria um novo post em um blog específico do Tumblr.
+      tags:
+        - Tumblr
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/SocialPostRequest"
+                - type: object
+                  properties:
+                    blogName:
+                      type: string
+                    text:
+                      type: string
+                    images:
+                      type: array
+                      items:
+                        type: base64
+                    tags:
+                      type: array
+                      items:
+                        type: string
+                  required:
+                    - blogName
+            example:
+              blogName: meu-blog-principal
+              text: Este é um tweet de exemplo!
+              tags:
+                - api
+                - teste
+              images:
+                - data:image/png;base64,iVBORw0KGgo...
+      responses:
+        "201":
+          description: Post criado com sucesso.
+  /twitter/post:
+    post:
+      summary: Cria um novo tweet.
+      tags:
+        - Twitter
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/SocialPostRequest"
+                - type: object
+                  properties:
+                    text:
+                      type: string
+                    images:
+                      type: array
+                      items:
+                        type: base64
+                    tags:
+                      type: array
+                      items:
+                        type: string
+            example:
+              text: Este é um tweet de exemplo!
+              tags:
+                - api
+                - teste
+              images:
+                - data:image/png;base64,iVBORw0KGgo...
+      responses:
+        "201":
+          description: Tweet criado com sucesso.
+  /:
+    get:
+      summary: Rota de verificação
+      tags:
+        - Healthcheck
+      description: Retorna uma mensagem simples para indicar que a API está funcionando.
+    responses:
+      "200":
+        description: Sucesso.
+tags: []

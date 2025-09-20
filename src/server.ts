@@ -7,6 +7,9 @@ import http from 'http';
 import { Server } from 'socket.io';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
+import yaml from 'js-yaml';
+import fs from 'fs';
+import path from 'path';
 import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import Logger from './config/logger';
@@ -63,25 +66,10 @@ server.listen(port, 0, () => {
 
 app.use(express.json({ limit: '50mb' }));
 
-const swaggerOptions = {
-    swaggerDefinition: {
-        openapi: '3.0.0',
-        info: {
-            title: 'API de Post',
-            version: '1.0.0',
-            description: 'API para postar conteúdo em diversas redes sociais.',
-        },
-        components: {
-            securitySchemes: {
-                bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
-            }
-        },
-        security: [{ bearerAuth: [] }]
-    },
-    apis: ['./src/server.ts', './src/routes/*.ts'],
-};
+const swaggerFilePath = path.join(process.cwd(), 'swagger-spec.yaml');
+const swaggerFileContent = fs.readFileSync(swaggerFilePath, 'utf8');
+const swaggerDocs = yaml.load(swaggerFileContent) as object;
 
-const swaggerDocs = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 app.get('/swagger-ui.html', (req, res) => {
     res.redirect('/api-docs');
