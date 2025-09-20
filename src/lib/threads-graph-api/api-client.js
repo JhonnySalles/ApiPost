@@ -375,26 +375,28 @@ var ThreadsAuthenticatedApiClient = /** @class */ (function (_super) {
             __assign(
               __assign(
                 __assign(
-                  {
-                    media_type: params.mediaType,
-                    text: params.text,
-                    reply_control: params.replyControl,
-                    reply_to_id: params.replyToId,
-                    topic_tag: params.topicTag ? params.topicTag : null,
-                  },
-                  params.mediaType === 'IMAGE' && {
-                    image_url: params.imageUrl,
+                  __assign(
+                    {
+                      media_type: params.mediaType,
+                      text: params.text,
+                      reply_control: params.replyControl,
+                      reply_to_id: params.replyToId,
+                    },
+                    params.mediaType === 'IMAGE' && {
+                      image_url: params.imageUrl,
+                      is_carousel_item: params.isCarouselItem,
+                    }
+                  ),
+                  params.mediaType === 'VIDEO' && {
+                    video_url: params.videoUrl,
                     is_carousel_item: params.isCarouselItem,
                   }
                 ),
-                params.mediaType === 'VIDEO' && {
-                  video_url: params.videoUrl,
-                  is_carousel_item: params.isCarouselItem,
+                params.mediaType === 'CAROUSEL' && {
+                  children: params.children.join(','),
                 }
               ),
-              params.mediaType === 'CAROUSEL' && {
-                children: params.children.join(','),
-              }
+              params.topicTag && { topic_tag: params.topicTag }
             ),
             CreateMediaContainerResponseSchema
           ),
