@@ -1,4 +1,3 @@
-// src/routes/tumblrRoutes.ts
 import { Router, Request, Response } from 'express';
 import tumblr from 'tumblr.js';
 import Logger from '../config/logger';

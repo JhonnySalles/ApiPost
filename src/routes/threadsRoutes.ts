@@ -1,4 +1,3 @@
-// src/routes/threadsRoutes.ts
 import { Router, Request, Response } from 'express';
 import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';

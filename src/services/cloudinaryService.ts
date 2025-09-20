@@ -1,4 +1,3 @@
-// src/services/cloudinaryService.ts
 import { v2 as cloudinary } from 'cloudinary';
 import Logger from '../config/logger';
 

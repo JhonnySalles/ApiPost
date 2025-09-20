@@ -1,5 +1,3 @@
-// src/utils/parsing.ts
-
 /**
  * Extrai o MIME type e os dados de uma string base64 no formato Data URL.
  * @param dataUrl A string no formato "data:image/jpeg;base64,..."

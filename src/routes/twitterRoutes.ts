@@ -1,4 +1,3 @@
-// src/routes/twitterRoutes.ts
 import { Router, Request, Response } from 'express';
 import { TwitterApi } from 'twitter-api-v2';
 import Logger from '../config/logger';

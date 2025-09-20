@@ -1,4 +1,3 @@
-// setup-threads.ts
 import { ThreadsPublicApiClient } from '@libs/threads-graph-api/index.js';
 import http from 'http';
 import url from 'url';

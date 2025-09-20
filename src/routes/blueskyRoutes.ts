@@ -1,4 +1,3 @@
-// src/routes/blueskyRoutes.ts
 import { Router, Request, Response } from 'express';
 import { BskyAgent, RichText } from '@atproto/api';
 import Logger from '../config/logger';

@@ -1,4 +1,3 @@
-// setup-twitter.ts (versão para OAuth 1.0a)
 import { TwitterApi } from 'twitter-api-v2';
 import http from 'http';
 import url from 'url';

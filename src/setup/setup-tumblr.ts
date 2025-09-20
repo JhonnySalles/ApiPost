@@ -1,4 +1,3 @@
-// setup-tumblr.ts (versão corrigida)
 import tumblr from 'tumblr.js';
 import inquirer from 'inquirer';
 import { URLSearchParams } from 'url';

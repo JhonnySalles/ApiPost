@@ -1,4 +1,3 @@
-// src/routes/publishAllRoutes.ts
 import { Router, Request, Response } from 'express';
 import { protect } from '../middleware/authMiddleware';
 import Logger from '../config/logger';

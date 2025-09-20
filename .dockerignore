@@ -1,5 +1,3 @@
-# Arquivo .dockerignore
-
 # Dependências e arquivos de build local
 node_modules
 dist

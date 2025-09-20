@@ -1,4 +1,3 @@
-// src/server.ts
 import { loadSecrets } from './config/secrets';
 loadSecrets();
 
