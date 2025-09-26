@@ -87,6 +87,17 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
  *  post:
  *    summary: Cria um novo tweet.
  *    tags: [Twitter]
+ *    description: |
+ *                 Publica um novo tweet na conta do Twitter autenticada. A postagem pode conter texto, até 4 imagens e tags.
+ *                 
+ *                 **Corpo da Requisição:**
+ *                 * **`text`** (string, obrigatório): O conteúdo principal do tweet.
+ *                 * **`images`** (array, opcional): Uma lista de até 4 imagens no formato Data URL (base64).
+ *                 * **`tags`** (array, opcional): Uma lista de tags que serão convertidas em hashtags e adicionadas ao final do texto.
+ *                 
+ *                 **Corpo da Resposta:**
+ *                 * Retorna um objeto com os dados do tweet criado com sucesso (status `201 Created`).
+ *                 * Retorna um erro `400 Bad Request` se os dados forem inválidos (ex: mais de 4 imagens).
  *    security:
  *      - bearerAuth: []
  *    requestBody:

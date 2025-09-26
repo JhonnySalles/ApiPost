@@ -114,17 +114,29 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
  *  post:
  *    summary: Posta em múltiplas plataformas de uma vez.
  *    tags: [Publish All]
- *    description: | 
- *      Inicia um processo em segundo plano para postar conteúdo em várias plataformas.
- *      O cliente deve primeiro conectar-se ao servidor via WebSocket para obter um `socketId`.
- *      A API responde imediatamente com '202 Accepted'. O progresso e o resultado final são enviados através de eventos WebSocket para o `socketId` fornecido.
- *      **Eventos WebSocket Emitidos pelo Servidor:**
- *      1. `progressUpdate`: Enviado para cada plataforma processada.
- *         `{ "type": "progress", "platform": "twitter", "status": "success", "progress": 50 }`
- *      2. `taskCompleted`: Enviado ao final de todo o processo com um sumário.
- *         `{ "type": "summary", "status": "completed", "summary": { ... } }`
- *    security:
- *      - bearerAuth: []
+ *    description: |
+ *                 Inicia um processo de postagem assíncrona para múltiplas plataformas de mídia social. Este é o endpoint principal e recomendado para a maioria das operações. A API responde imediatamente confirmando o recebimento da tarefa e reporta o progresso e o resultado final em tempo real através de uma conexão WebSocket estabelecida previamente.
+ *               
+ *                 **Fluxo de Execução:**
+ *                 1. O aplicativo cliente deve primeiro estabelecer uma conexão WebSocket com o servidor para obter um `socketId` único.
+ *                 2. O cliente envia uma requisição `POST` para este endpoint com o `socketId` e o conteúdo a ser postado.
+ *                 3. A API valida a requisição, responde imediatamente com o status `202 Accepted` e inicia o processamento em segundo plano.
+ *                 4. Para cada plataforma processada, a API emite um evento `progressUpdate` para o `socketId` do cliente.
+ *                 5. Ao final de todas as tentativas, a API emite um evento `taskCompleted` com um sumário completo da operação.
+ *               
+ *                 **Corpo da Requisição:**
+ *                 * **`platforms`** (array de strings, obrigatório): Lista das plataformas onde o conteúdo será publicado. Valores válidos: `tumblr`, `twitter`, `bluesky`, `threads`.
+ *                 * **`socketId`** (string, obrigatório): O ID da conexão WebSocket do cliente, usado para receber os retornos de progresso.
+ *                 * **`text`** (string, opcional): O conteúdo de texto principal do post.
+ *                 * **`images`** (array de objetos, opcional): Lista de imagens a serem publicadas.
+ *                   * `base64`: A imagem no formato Data URL (`data:image/jpeg;base64,...`).
+ *                   * `platforms`: (opcional) Um array especificando em quais plataformas esta imagem específica deve ser publicada. Se omitido, a imagem é enviada para todas as plataformas listadas na raiz da requisição.
+ *                 * **`tags`** (array de strings, opcional): Uma lista de tags a serem associadas ao post. A formatação (`#hashtag`) e as limitações (ex: apenas a primeira tag no Threads) são tratadas pela API para cada plataforma.
+ *                 * **`platformOptions`** (objeto, opcional): Um objeto para fornecer parâmetros específicos de cada plataforma.
+ *                   * `tumblr`: Requer a propriedade `blogName` (string) para identificar o blog de destino.
+ *               
+ *                 **Corpo da Resposta:**
+ *                 * Retorna imediatamente uma resposta de sucesso (status `202 Accepted`) indicando que a tarefa foi recebida e iniciada. O resultado detalhado é enviado via WebSocket.
  *    requestBody:
  *      required: true
  *      content:

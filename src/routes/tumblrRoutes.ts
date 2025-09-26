@@ -20,6 +20,12 @@ const tumblrClient = tumblr.createClient({
  *  get:
  *    summary: Retorna a lista de blogs do usuário no Tumblr.
  *    tags: [Tumblr]
+ *    description: |
+ *                 Recupera a lista de blogs associados à conta do Tumblr autenticada na API. O retorno inclui o nome de exibição (título) e o identificador único de cada blog. O identificador (`name`) é o valor que deve ser usado no parâmetro `blogName` ao criar um novo post.
+ *                
+ *                 **Corpo da Resposta:**
+ *                 * Retorna um objeto contendo um array de blogs, onde cada objeto possui as chaves `name` e `title` (status `200 OK`).
+ *                 * Retorna um erro `500 Internal Server Error` se houver uma falha na comunicação com a API do Tumblr.
  *    security:
  *      - bearerAuth: []
  *    responses:
@@ -113,6 +119,18 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
  *  post:
  *    summary: Cria um novo post em um blog específico do Tumblr.
  *    tags: [Tumblr]
+ *    description: |
+ *                 Cria um novo post em um blog específico do Tumblr. A postagem pode ser de texto ou um photoset com múltiplas imagens.
+ *                 
+ *                 **Corpo da Requisição:**
+ *                 * **`blogName`** (string, obrigatório): O identificador do blog do Tumblr onde o post será publicado (ex: "meu-blog-principal").
+ *                 * **`text`** (string, opcional): O corpo do texto ou a legenda para o post de imagem.
+ *                 * **`images`** (array, opcional): Uma lista de imagens no formato Data URL (base64) para criar um photoset.
+ *                 * **`tags`** (array, opcional): Uma lista de tags para associar ao post.
+ *                 
+ *                 **Corpo da Resposta:**
+ *                 * Retorna um objeto com os dados do post criado com sucesso (status `201 Created`).
+ *                 * Retorna um erro `400 Bad Request` se o `blogName` não for fornecido ou se a API do Tumblr rejeitar a formatação.
  *    security:
  *      - bearerAuth: []
  *    requestBody:

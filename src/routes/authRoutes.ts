@@ -17,6 +17,17 @@ const TOKEN_EXPIRATION_IN_SECONDS = 24 * 60 * 60;
  *  post:
  *    summary: Autentica o usuário e retorna um token JWT.
  *    tags: [Autenticação]
+ *    description: |
+ *                 Autentica na API utilizando um conjunto de credenciais pré-definidas e retorna um token de acesso JWT. Este token é necessário para autorizar todas as outras requisições aos endpoints protegidos da aplicação. O token gerado possui uma validade de 24 horas.
+ *                
+ *                 **Corpo da Requisição:**
+ *                 * **`username`** (string, obrigatório): O nome de usuário definido para a API.
+ *                 * **`password`** (string, obrigatório): A senha definida para a API.
+ *                 * **`accessToken`** (string, obrigatório): Um token de acesso estático que atua como uma camada adicional de segurança.
+ *                
+ *                 **Corpo da Resposta:**
+ *                 * Retorna um objeto contendo a mensagem de sucesso, o token JWT e a data de expiração no formato ISO 8601 (status `200 OK`).
+ *                 * Retorna um erro `401 Unauthorized` caso qualquer uma das credenciais fornecidas seja inválida.
  *    requestBody:
  *      required: true
  *      content:
@@ -81,6 +92,18 @@ router.post('/login', (req: Request, res: Response) => {
  *  post:
  *    summary: Renova um token JWT expirado.
  *    tags: [Autenticação]
+ *    description: |
+ *                 Gera um novo token de acesso JWT com validade de 24 horas a partir de um token existente, mesmo que este já esteja expirado. Este endpoint é utilizado para manter a sessão do cliente ativa sem a necessidade de enviar as credenciais de `username` e `password` novamente.
+ *               
+ *                 **Cabeçalho da Requisição:**
+ *                 * **`Authorization`**: Deve conter o token JWT atual (mesmo que expirado) no formato `Bearer SEU_TOKEN_AQUI`.
+ *               
+ *                 **Corpo da Requisição:**
+ *                 * **`accessToken`** (string, obrigatório): O mesmo token de acesso estático usado no login, para validar a legitimidade da requisição de renovação.
+ *               
+ *                 **Corpo da Resposta:**
+ *                 * Retorna um objeto com a mensagem de sucesso, o **novo** token JWT e a sua **nova** data de expiração (status `200 OK`).
+ *                 * Retorna um erro `401 Unauthorized` se o token antigo for inválido (assinatura incorreta) ou se o `accessToken` não corresponder.
  *    security:
  *      - bearerAuth: []
  *    requestBody:

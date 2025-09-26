@@ -120,6 +120,17 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
  *  post:
  *    summary: Cria um novo post (skeet) no Bluesky.
  *    tags: [Bluesky]
+ *    description: |
+ *                 Publica um novo post (skeet) na conta do Bluesky autenticada. A postagem pode conter texto e até 4 imagens.
+ *                 
+ *                 **Corpo da Requisição:**
+ *                 * **`text`** (string, obrigatório): O conteúdo principal do post.
+ *                 * **`images`** (array, opcional): Uma lista de até 4 imagens no formato Data URL (base64). Imagens maiores que o limite da plataforma (~976KB) serão automaticamente otimizadas.
+ *                 * **`tags`** (array, opcional): Uma lista de tags que serão convertidas em hashtags e adicionadas ao final do texto.
+ *                 
+ *                 **Corpo da Resposta:**
+ *                 * Retorna um objeto com os dados do post criado com sucesso (status `201 Created`).
+ *                 * Retorna um erro `400 Bad Request` se os dados forem inválidos (ex: mais de 4 imagens).
  *    security:
  *      - bearerAuth: []
  *    requestBody:

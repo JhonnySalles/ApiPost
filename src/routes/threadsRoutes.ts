@@ -25,6 +25,8 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
     if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID)
         throw new Error('Threads: Credenciais da Threads Graph API não configuradas no .env');
 
+    let debugLog = 'Iniciando processo de postagem no Threads.\n';
+
     try {
         const client = new ThreadsAuthenticatedApiClient(THREADS_ACCESS_TOKEN, THREADS_USER_ID);
 
@@ -52,6 +54,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         let creationId: string;
         if (!hasImages) {
             Logger.info('[Threads] Criando post de texto...');
+            debugLog += `\nCenário: Texto Apenas.\nParâmetros para createMediaContainer:\n${JSON.stringify({ mediaType: 'TEXT', text: (text || "").replace("\t", ""), topicTag: topicTag, }, null, 2)}\n`;
             const response = await client.createMediaContainer({
                 mediaType: 'TEXT',
                 text: (text || "").replace("\t", ""),
@@ -65,6 +68,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
 
             if (imageUrls.length === 1) {
                 Logger.info('[Threads] Criando post de imagem única...');
+                debugLog += `\nCenário: Imagem Única.\nParâmetros para createMediaContainer:\n${JSON.stringify({ mediaType: 'IMAGE', text: text ? text.replace("\t", "") : undefined, imageUrl: imageUrls[0], topicTag: topicTag, }, null, 2)}\n`;
                 const response = await client.createMediaContainer({
                     mediaType: 'IMAGE',
                     text: text ? text.replace("\t", "") : undefined,
@@ -74,6 +78,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
                 creationId = response.id;
             } else {
                 Logger.info('[Threads] Criando contêineres de itens para o carrossel...');
+                debugLog += `\nCenário: Carrossel.\nParâmetros para os contêineres dos itens:\n${JSON.stringify(imageUrls.map(url => ({ mediaType: 'IMAGE', imageUrl: url, isCarouselItem: true })), null, 2)}\n`;
                 const itemContainerIds = await Promise.all(
                     imageUrls.map(url =>
                         client.createMediaContainer({
@@ -84,10 +89,17 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
                     )
                 );
 
+                let finalText = text || '';
+                if (topicTag && topicTag.length > 0) {
+                    const hashtags = `#${topicTag.replace(/ /g, '')}`;
+                    finalText = finalText ? `${hashtags}\n${finalText}` : hashtags;
+                }
+
                 Logger.info('[Threads] Criando contêiner principal do carrossel...');
+                debugLog += `\nParâmetros para o contêiner principal do carrossel:\n${JSON.stringify({ mediaType: 'CAROUSEL', text: finalText ? finalText.replace("\t", "") : undefined, children: itemContainerIds, }, null, 2)}\n`;
                 const carouselContainer = await client.createMediaContainer({
                     mediaType: 'CAROUSEL',
-                    text: text ? text.replace("\t", "") : undefined,
+                    text: finalText ? finalText.replace("\t", "") : undefined,
                     children: itemContainerIds,
                 });
                 creationId = carouselContainer.id;
@@ -95,17 +107,23 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         }
 
         Logger.info(`[Threads] Publicando contêiner com ID: ${creationId}...`);
+        debugLog += `\nParâmetros para Publicação:\n${JSON.stringify({ creationId }, null, 2)}\n`;
         const { id: postId } = await client.publish({ creationId });
         return { success: true, data: { postId } };
     } catch (error) {
+        debugLog += `\nERRO CAPTURADO: ${error instanceof Error ? error.message : String(error)}`;
+        Sentry.captureException(error, {
+            extra: {
+                threadsDebugLog: debugLog,
+            },
+        });
+
         if (error instanceof ThreadsApiError) {
             const apiError = error.getThreadsError();
             Logger.error('[Threads] Erro da API do Threads: %s - Detalhes: %o', error.message, apiError);
-            Sentry.captureException(error);
             throw new Error(`Erro da API do Threads: ${apiError?.error?.message || error.message}`);
         }
-        Logger.error('Erro ao postar no Threads: %o', error);
-        Sentry.captureException(error);
+        Logger.error('[Threads] Erro ao postar no Threads: %o', error);
         throw error;
     }
 }
@@ -116,6 +134,20 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
  *  post:
  *    summary: Cria um novo post no Threads.
  *    tags: [Threads]
+ *    description: |
+ *                 Publica um novo post no Threads. A função se adapta ao conteúdo fornecido:
+ *                 1.  **Apenas Texto:** Cria um post de texto simples.
+ *                 2.  **Texto e 1 Imagem:** Cria um post de imagem única com legenda.
+ *                 3.  **Texto e 2+ Imagens:** Cria um post em carrossel.
+ *                 
+ *                 **Corpo da Requisição:**
+ *                 * **`text`** (string, opcional): O conteúdo do post, que servirá como legenda para posts com imagem/carrossel.
+ *                 * **`images`** (array, opcional): Uma lista de imagens no formato Data URL (base64). As imagens são primeiro enviadas para um serviço de hospedagem (Cloudinary) para gerar URLs públicas.
+ *                 * **`tags`** (array, opcional): Apenas a **primeira tag** da lista será usada como `topic_tag` ou adicionada como hashtag, de acordo com as regras da API do Threads para cada tipo de post.
+ *                 
+ *                 **Corpo da Resposta:**
+ *                 * Retorna um objeto com o ID do post criado com sucesso (status `201 Created`).
+ *                 * Retorna um erro `400 Bad Request` se os dados forem insuficientes (sem texto ou imagem).
  *    security:
  *      - bearerAuth: []
  *    requestBody:

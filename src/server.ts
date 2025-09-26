@@ -70,23 +70,34 @@ const swaggerFileContent = fs.readFileSync(swaggerFilePath, 'utf8');
 const swaggerDocs = yaml.load(swaggerFileContent) as object;
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-app.get('/swagger-ui.html', (req, res) => {
+app.get(['/swagger-ui.html', '/docs', '/documentacao', '/'], (req, res) => {
     res.redirect('/api-docs');
 });
 
 /**
  * @openapi
  * paths:
- *   /:
+ *   /health:
  *     get:
  *       summary: Rota de verificação
  *       tags: [Healthcheck]
- *       description: Retorna uma mensagem simples para indicar que a API está funcionando.
+ *       description: |
+ *                    Verifica a saúde e a disponibilidade da API. Este é um endpoint público e não autenticado, projetado para ser usado como uma verificação de "health check" por serviços de monitoramento ou para um teste rápido de conectividade para confirmar que o serviço está no ar.
+ *                   
+ *                    **Parâmetros de Path:**
+ *                    * Nenhum.
+ *                   
+ *                    **Corpo da Requisição:**
+ *                    * N/A (requisições `GET` não possuem corpo).
+ *                   
+ *                    **Corpo da Resposta:**
+ *                    * Retorna uma mensagem de texto simples (`text/html`) confirmando que a API está em execução (status `200 OK`).
+ *                    * Este endpoint não possui respostas de erro específicas documentadas.
  *     responses:
  *       '200':
  *         description: Sucesso.
  */
-app.get('/', (req, res) => {
+app.get('/health', (req, res) => {
     res.send('A API está funcionando! Acesse /api-docs para ver a documentação.');
 });
 

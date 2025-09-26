@@ -64,6 +64,27 @@ paths:
       summary: Autentica o usuário e retorna um token JWT.
       tags:
         - Autenticação
+      description: >
+        Autentica na API utilizando um conjunto de credenciais pré-definidas e
+        retorna um token de acesso JWT. Este token é necessário para autorizar
+        todas as outras requisições aos endpoints protegidos da aplicação. O
+        token gerado possui uma validade de 24 horas.
+
+
+        **Corpo da Requisição:**
+
+        * **`username`** (string, obrigatório): O nome de usuário definido para a API.
+
+        * **`password`** (string, obrigatório): A senha definida para a API.
+
+        * **`accessToken`** (string, obrigatório): Um token de acesso estático que atua como uma camada adicional de segurança.
+
+
+        **Corpo da Resposta:**
+
+        * Retorna um objeto contendo a mensagem de sucesso, o token JWT e a data de expiração no formato ISO 8601 (status `200 OK`).
+
+        * Retorna um erro `401 Unauthorized` caso qualquer uma das credenciais fornecidas seja inválida.
       requestBody:
         required: true
         content:
@@ -99,6 +120,28 @@ paths:
       summary: Renova um token JWT expirado.
       tags:
         - Autenticação
+      description: >
+        Gera um novo token de acesso JWT com validade de 24 horas a partir de um
+        token existente, mesmo que este já esteja expirado. Este endpoint é
+        utilizado para manter a sessão do cliente ativa sem a necessidade de
+        enviar as credenciais de `username` e `password` novamente.
+
+
+        **Cabeçalho da Requisição:**
+
+        * **`Authorization`**: Deve conter o token JWT atual (mesmo que expirado) no formato `Bearer SEU_TOKEN_AQUI`.
+
+
+        **Corpo da Requisição:**
+
+        * **`accessToken`** (string, obrigatório): O mesmo token de acesso estático usado no login, para validar a legitimidade da requisição de renovação.
+
+
+        **Corpo da Resposta:**
+
+        * Retorna um objeto com a mensagem de sucesso, o **novo** token JWT e a sua **nova** data de expiração (status `200 OK`).
+
+        * Retorna um erro `401 Unauthorized` se o token antigo for inválido (assinatura incorreta) ou se o `accessToken` não corresponder.
       security:
         - bearerAuth: []
       requestBody:
@@ -124,6 +167,25 @@ paths:
       summary: Cria um novo post (skeet) no Bluesky.
       tags:
         - Bluesky
+      description: >
+        Publica um novo post (skeet) na conta do Bluesky autenticada. A postagem
+        pode conter texto e até 4 imagens.
+
+
+        **Corpo da Requisição:**
+
+        * **`text`** (string, obrigatório): O conteúdo principal do post.
+
+        * **`images`** (array, opcional): Uma lista de até 4 imagens no formato Data URL (base64). Imagens maiores que o limite da plataforma (~976KB) serão automaticamente otimizadas.
+
+        * **`tags`** (array, opcional): Uma lista de tags que serão convertidas em hashtags e adicionadas ao final do texto.
+
+
+        **Corpo da Resposta:**
+
+        * Retorna um objeto com os dados do post criado com sucesso (status `201 Created`).
+
+        * Retorna um erro `400 Bad Request` se os dados forem inválidos (ex: mais de 4 imagens).
       security:
         - bearerAuth: []
       requestBody:
@@ -161,21 +223,45 @@ paths:
       tags:
         - Publish All
       description: >
-        Inicia um processo em segundo plano para postar conteúdo em várias
-        plataformas.
+        Inicia um processo de postagem assíncrona para múltiplas plataformas de
+        mídia social. Este é o endpoint principal e recomendado para a maioria
+        das operações. A API responde imediatamente confirmando o recebimento da
+        tarefa e reporta o progresso e o resultado final em tempo real através
+        de uma conexão WebSocket estabelecida previamente.
 
-        O cliente deve primeiro conectar-se ao servidor via WebSocket para obter um `socketId`.
 
-        A API responde imediatamente com '202 Accepted'. O progresso e o resultado final são enviados através de eventos WebSocket para o `socketId` fornecido.
+        **Fluxo de Execução:**
 
-        **Eventos WebSocket Emitidos pelo Servidor:**
+        1. O aplicativo cliente deve primeiro estabelecer uma conexão WebSocket com o servidor para obter um `socketId` único.
 
-        1. `progressUpdate`: Enviado para cada plataforma processada.
-           `{ "type": "progress", "platform": "twitter", "status": "success", "progress": 50 }`
-        2. `taskCompleted`: Enviado ao final de todo o processo com um sumário.
-           `{ "type": "summary", "status": "completed", "summary": { ... } }`
-      security:
-        - bearerAuth: []
+        2. O cliente envia uma requisição `POST` para este endpoint com o `socketId` e o conteúdo a ser postado.
+
+        3. A API valida a requisição, responde imediatamente com o status `202 Accepted` e inicia o processamento em segundo plano.
+
+        4. Para cada plataforma processada, a API emite um evento `progressUpdate` para o `socketId` do cliente.
+
+        5. Ao final de todas as tentativas, a API emite um evento `taskCompleted` com um sumário completo da operação.
+
+
+        **Corpo da Requisição:**
+
+        * **`platforms`** (array de strings, obrigatório): Lista das plataformas onde o conteúdo será publicado. Valores válidos: `tumblr`, `twitter`, `bluesky`, `threads`.
+
+        * **`socketId`** (string, obrigatório): O ID da conexão WebSocket do cliente, usado para receber os retornos de progresso.
+
+        * **`text`** (string, opcional): O conteúdo de texto principal do post.
+
+        * **`images`** (array de objetos, opcional): Lista de imagens a serem publicadas.
+          * `base64`: A imagem no formato Data URL (`data:image/jpeg;base64,...`).
+          * `platforms`: (opcional) Um array especificando em quais plataformas esta imagem específica deve ser publicada. Se omitido, a imagem é enviada para todas as plataformas listadas na raiz da requisição.
+        * **`tags`** (array de strings, opcional): Uma lista de tags a serem associadas ao post. A formatação (`#hashtag`) e as limitações (ex: apenas a primeira tag no Threads) são tratadas pela API para cada plataforma.
+
+        * **`platformOptions`** (objeto, opcional): Um objeto para fornecer parâmetros específicos de cada plataforma.
+          * `tumblr`: Requer a propriedade `blogName` (string) para identificar o blog de destino.
+
+        **Corpo da Resposta:**
+
+        * Retorna imediatamente uma resposta de sucesso (status `202 Accepted`) indicando que a tarefa foi recebida e iniciada. O resultado detalhado é enviado via WebSocket.
       requestBody:
         required: true
         content:
@@ -239,6 +325,31 @@ paths:
       summary: Cria um novo post no Threads.
       tags:
         - Threads
+      description: >
+        Publica um novo post no Threads. A função se adapta ao conteúdo
+        fornecido:
+
+        1.  **Apenas Texto:** Cria um post de texto simples.
+
+        2.  **Texto e 1 Imagem:** Cria um post de imagem única com legenda.
+
+        3.  **Texto e 2+ Imagens:** Cria um post em carrossel.
+
+
+        **Corpo da Requisição:**
+
+        * **`text`** (string, opcional): O conteúdo do post, que servirá como legenda para posts com imagem/carrossel.
+
+        * **`images`** (array, opcional): Uma lista de imagens no formato Data URL (base64). As imagens são primeiro enviadas para um serviço de hospedagem (Cloudinary) para gerar URLs públicas.
+
+        * **`tags`** (array, opcional): Apenas a **primeira tag** da lista será usada como `topic_tag` ou adicionada como hashtag, de acordo com as regras da API do Threads para cada tipo de post.
+
+
+        **Corpo da Resposta:**
+
+        * Retorna um objeto com o ID do post criado com sucesso (status `201 Created`).
+
+        * Retorna um erro `400 Bad Request` se os dados forem insuficientes (sem texto ou imagem).
       security:
         - bearerAuth: []
       requestBody:
@@ -275,6 +386,18 @@ paths:
       summary: Retorna a lista de blogs do usuário no Tumblr.
       tags:
         - Tumblr
+      description: >
+        Recupera a lista de blogs associados à conta do Tumblr autenticada na
+        API. O retorno inclui o nome de exibição (título) e o identificador
+        único de cada blog. O identificador (`name`) é o valor que deve ser
+        usado no parâmetro `blogName` ao criar um novo post.
+
+
+        **Corpo da Resposta:**
+
+        * Retorna um objeto contendo um array de blogs, onde cada objeto possui as chaves `name` e `title` (status `200 OK`).
+
+        * Retorna um erro `500 Internal Server Error` se houver uma falha na comunicação com a API do Tumblr.
       security:
         - bearerAuth: []
       responses:
@@ -303,6 +426,27 @@ paths:
       summary: Cria um novo post em um blog específico do Tumblr.
       tags:
         - Tumblr
+      description: >
+        Cria um novo post em um blog específico do Tumblr. A postagem pode ser
+        de texto ou um photoset com múltiplas imagens.
+
+
+        **Corpo da Requisição:**
+
+        * **`blogName`** (string, obrigatório): O identificador do blog do Tumblr onde o post será publicado (ex: "meu-blog-principal").
+
+        * **`text`** (string, opcional): O corpo do texto ou a legenda para o post de imagem.
+
+        * **`images`** (array, opcional): Uma lista de imagens no formato Data URL (base64) para criar um photoset.
+
+        * **`tags`** (array, opcional): Uma lista de tags para associar ao post.
+
+
+        **Corpo da Resposta:**
+
+        * Retorna um objeto com os dados do post criado com sucesso (status `201 Created`).
+
+        * Retorna um erro `400 Bad Request` se o `blogName` não for fornecido ou se a API do Tumblr rejeitar a formatação.
       security:
         - bearerAuth: []
       requestBody:
@@ -344,6 +488,25 @@ paths:
       summary: Cria um novo tweet.
       tags:
         - Twitter
+      description: >
+        Publica um novo tweet na conta do Twitter autenticada. A postagem pode
+        conter texto, até 4 imagens e tags.
+
+
+        **Corpo da Requisição:**
+
+        * **`text`** (string, obrigatório): O conteúdo principal do tweet.
+
+        * **`images`** (array, opcional): Uma lista de até 4 imagens no formato Data URL (base64).
+
+        * **`tags`** (array, opcional): Uma lista de tags que serão convertidas em hashtags e adicionadas ao final do texto.
+
+
+        **Corpo da Resposta:**
+
+        * Retorna um objeto com os dados do tweet criado com sucesso (status `201 Created`).
+
+        * Retorna um erro `400 Bad Request` se os dados forem inválidos (ex: mais de 4 imagens).
       security:
         - bearerAuth: []
       requestBody:
@@ -375,12 +538,33 @@ paths:
       responses:
         "201":
           description: Tweet criado com sucesso.
-  /:
+  /health:
     get:
       summary: Rota de verificação
       tags:
         - Healthcheck
-      description: Retorna uma mensagem simples para indicar que a API está funcionando.
+      description: >
+        Verifica a saúde e a disponibilidade da API. Este é um endpoint público
+        e não autenticado, projetado para ser usado como uma verificação de
+        "health check" por serviços de monitoramento ou para um teste rápido de
+        conectividade para confirmar que o serviço está no ar.
+
+
+        **Parâmetros de Path:**
+
+        * Nenhum.
+
+
+        **Corpo da Requisição:**
+
+        * N/A (requisições `GET` não possuem corpo).
+
+
+        **Corpo da Resposta:**
+
+        * Retorna uma mensagem de texto simples (`text/html`) confirmando que a API está em execução (status `200 OK`).
+
+        * Este endpoint não possui respostas de erro específicas documentadas.
     responses:
       "200":
         description: Sucesso.
