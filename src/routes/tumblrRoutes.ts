@@ -4,6 +4,7 @@ import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
+import { BASE_DOCUMENT, db } from '../services/firebaseService';
 
 const router = Router();
 
@@ -69,16 +70,20 @@ interface TumblrPostOptions {
     text?: string;
     images?: string[];
     tags?: string[];
+    instanceId?: string;
+    postId?: string;
 }
 
 export async function handleTumblrPost(options: TumblrPostOptions) {
-    const { blogName, text, images, tags } = options;
+    const { blogName, text, images, tags, instanceId, postId } = options;
 
     if (!blogName)
         throw new Error(`Tumblr: O nome do blog (blogName) é obrigatório para o Tumblr.`);
 
     if (!text && (!images || images.length === 0))
         throw new Error(`Tumblr: É necessário fornecer texto ou imagens.`);
+
+    const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 
     try {
         const contentBlocks: any[] = [];
@@ -99,16 +104,26 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
             }
         }
 
-        const responseData = await tumblrClient.createPost(blogName, {
+        if (process.env.IGNORAR_POST)
+            Logger.warn(`[Tumblr] Ignorado o envio do post.`);
+
+        const responseData = process.env.IGNORAR_POST ? { message: `[Tumblr] Ignorado o envio do post.` } : await tumblrClient.createPost(blogName, {
             content: contentBlocks,
             tags: tags,
         });
 
-        Logger.info(`Post criado no Tumblr com sucesso para o blog ${blogName}`);
+        if (dbRef)
+            await dbRef.update({ tumblr: { status: 'success', error: null, } });
+
+        Logger.info(`[Tumblr] Post criado no Tumblr com sucesso para o blog ${blogName}`);
         return { success: true, data: responseData };
     } catch (error) {
-        Logger.error(`Erro ao postar no Tumblr no blog ${blogName}: %o`, error);
+        Logger.error(`[Tumblr] Erro ao postar no Tumblr no blog ${blogName}: %o`, error);
         Sentry.captureException(error, { extra: { blogName } });
+
+        if (dbRef)
+            await dbRef.update({ tumblr: { status: 'error', error: (error && error instanceof Error ? error.message : 'Erro ao postar no Tumblr.') } });
+
         throw error;
     }
 }
@@ -127,6 +142,8 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
  *                 * **`text`** (string, opcional): O corpo do texto ou a legenda para o post de imagem.
  *                 * **`images`** (array, opcional): Uma lista de imagens no formato Data URL (base64) para criar um photoset.
  *                 * **`tags`** (array, opcional): Uma lista de tags para associar ao post.
+ *                 * **`instanceId`** (string, opcional): ID da instância do app cliente para rastreamento no Firebase.
+ *                 * **`postId`** (string, opcional): ID do post gerado pelo app cliente para rastreamento no Firebase.
  *                 
  *                 **Corpo da Resposta:**
  *                 * Retorna um objeto com os dados do post criado com sucesso (status `201 Created`).
@@ -146,6 +163,8 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
  *                  text: { type: string }
  *                  images: { type: array, items: { type: base64 } }
  *                  tags: { type: array, items: { type: string } }
+ *                  instanceId: { type: string }
+ *                  postId: { type: string }
  *                required:
  *                  - blogName
  *          example:
@@ -153,15 +172,27 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
  *            text: "Este é um tweet de exemplo!"
  *            tags: ["api", "teste"]
  *            images: ["data:image/png;base64,iVBORw0KGgo..."]
+ *            instanceId: "asdffasdfFMaxwBvUw49LOjc2"
+ *            postId: "153"
  *    responses:
  *      '201':
  *        description: Post criado com sucesso.
  */
 router.post('/post', protect, async (req: Request, res: Response) => {
+    const { instanceId, postId } = req.body;
+    const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
+
     try {
         const result = await handleTumblrPost(req.body);
+
+        if (dbRef)
+            await dbRef.update({ tumblr: { status: 'success', error: null, } });
+
         res.status(201).json({ message: 'Post criado com sucesso!', ...result });
     } catch (error: any) {
+        if (dbRef)
+            await dbRef.update({ tumblr: { status: 'error', error: error.message || 'Erro ao postar no Tumblr.' } });
+
         res.status(500).json({ message: error.message || 'Erro ao postar no Tumblr.' });
     }
 });

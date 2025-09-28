@@ -4,6 +4,7 @@ import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
+import { BASE_DOCUMENT, db } from '../services/firebaseService';
 
 const router = Router();
 
@@ -11,11 +12,13 @@ interface TwitterPostOptions {
     text: string;
     images?: string[];
     tags?: string[];
+    instanceId?: string;
+    postId?: string;
 }
 
 export async function handleTwitterPost(options: TwitterPostOptions) {
 
-    const { text, images, tags } = options;
+    const { text, images, tags, instanceId, postId } = options;
 
     if (!text && (!images || images.length === 0))
         throw new Error('Twitter: É necessário fornecer texto ou imagens.');
@@ -33,6 +36,8 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
     if (!TWITTER_APP_KEY || !TWITTER_APP_SECRET || !TWITTER_ACCESS_TOKEN || !TWITTER_ACCESS_SECRET)
         throw new Error('Twitter: As 4 chaves do Twitter (OAuth 1.0a) não estão configuradas no .env');
 
+    const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
+
     try {
         const client = new TwitterApi({
             appKey: TWITTER_APP_KEY,
@@ -43,12 +48,14 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
 
         const mediaIds: string[] = [];
 
-        if (images && images.length > 0) {
+        if (process.env.IGNORAR_POST)
+            Logger.warn(`[Twitter] Ignorado o envio do post.`);
+        else if (images && images.length > 0) {
             Logger.info('Fazendo upload de imagens para o Twitter...');
             for (const imageDataUrl of images) {
                 const parsedImage = parseDataUrl(imageDataUrl);
                 if (!parsedImage) {
-                    Logger.warn('Formato de imagem base64 inválido. Pulando imagem.');
+                    Logger.warn('[Twitter] Formato de imagem base64 inválido. Pulando imagem.');
                     continue;
                 }
 
@@ -57,7 +64,7 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
                 const mediaId = await client.v1.uploadMedia(imageBuffer, { type: imageType });
                 mediaIds.push(mediaId);
             }
-            Logger.info(`Upload de ${mediaIds.length} imagem(ns) concluído.`);
+            Logger.info(`[Twitter] Upload de ${mediaIds.length} imagem(ns) concluído.`);
         }
 
         let finalText = text || '';
@@ -66,17 +73,23 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
             finalText = finalText ? `${finalText}\n\n${hashtags}` : hashtags;
         }
 
-        Logger.info('Enviando o tweet...');
-        const tweetResult = await client.v2.tweet({
+        const tweetResult = process.env.IGNORAR_POST ? { data: { id: 1 }, message: `[Twitter] Ignorado o envio do post.` } : await client.v2.tweet({
             text: finalText,
             media: mediaIds.length > 0 ? { media_ids: mediaIds as [string] } : undefined,
         });
 
-        Logger.info(`Tweet criado com sucesso! ID: ${tweetResult.data.id}`);
+        if (dbRef)
+            await dbRef.update({ twitter: { status: 'success', error: null, } });
+
+        Logger.info(`[Twitter] Tweet criado com sucesso! ID: ${tweetResult.data.id}`);
         return { success: true, data: tweetResult.data };
     } catch (error) {
-        Logger.error('Erro ao postar no Twitter: %o', error);
+        Logger.error('[Twitter] Erro ao postar no Twitter: %o', error);
         Sentry.captureException(error);
+
+        if (dbRef)
+            await dbRef.update({ twitter: { status: 'error', error: (error && error instanceof Error ? error.message : 'Erro ao postar no Twitter.') } });
+
         throw error;
     }
 }
@@ -94,6 +107,8 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
  *                 * **`text`** (string, obrigatório): O conteúdo principal do tweet.
  *                 * **`images`** (array, opcional): Uma lista de até 4 imagens no formato Data URL (base64).
  *                 * **`tags`** (array, opcional): Uma lista de tags que serão convertidas em hashtags e adicionadas ao final do texto.
+ *                 * **`instanceId`** (string, opcional): ID da instância do app cliente para rastreamento no Firebase.
+ *                 * **`postId`** (string, opcional): ID do post gerado pelo app cliente para rastreamento no Firebase.
  *                 
  *                 **Corpo da Resposta:**
  *                 * Retorna um objeto com os dados do tweet criado com sucesso (status `201 Created`).
@@ -112,19 +127,33 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
  *                  text: { type: string }
  *                  images: { type: array, items: { type: base64 } }
  *                  tags: { type: array, items: { type: string } }
+ *                  instanceId: { type: string }
+ *                  postId: { type: string }
  *          example:
  *            text: "Este é um tweet de exemplo!"
  *            tags: ["api", "teste"]
  *            images: ["data:image/png;base64,iVBORw0KGgo..."]
+ *            instanceId: "asdffasdfFMaxwBvUw49LOjc2"
+ *            postId: "153"
  *    responses:
  *      '201':
  *        description: Tweet criado com sucesso.
  */
 router.post('/post', protect, async (req: Request, res: Response) => {
+    const { instanceId, postId } = req.body;
+    const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
+
     try {
         const result = await handleTwitterPost(req.body);
+
+        if (dbRef)
+            await dbRef.update({ twitter: { status: 'success', error: null, } });
+
         res.status(201).json({ message: 'Tweet criado com sucesso!', ...result });
     } catch (error: any) {
+        if (dbRef)
+            await dbRef.update({ twitter: { status: 'error', error: error.message || 'Erro ao postar no Twitter.' } });
+
         res.status(500).json({ message: error.message || 'Erro ao postar no Twitter.' });
     }
 });

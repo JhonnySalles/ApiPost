@@ -23,7 +23,7 @@ function flattenAndSetEnv(obj: any, prefix = '') {
 
 export function loadSecrets() {
     if (process.env.K_SERVICE) {
-        Logger.info('Ambiente de produção (Cloud Run) detectado. Carregando segredos do JSON.');
+        Logger.info('🖥️  Ambiente de produção (Cloud Run) detectado. Carregando segredos do JSON.');
 
         const secretsJsonString = process.env.API_POST_SECRETS_JSON;
         if (!secretsJsonString) {
@@ -39,7 +39,7 @@ export function loadSecrets() {
             Logger.error('ERRO: Falha ao fazer o parse do JSON de segredos:  %o', error);
         }
     } else {
-        Logger.warn('Ambiente local detectado. Carregando segredos do arquivo .env.');
+        Logger.warn('🖥️  Ambiente local detectado. Carregando segredos do arquivo .env.');
         dotenv.config();
     }
 }

@@ -7,7 +7,7 @@ export const protect = (req: Request, res: Response, next: NextFunction) => {
     const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        Logger.warn('Tentativa de acesso sem token JWT.');
+        Logger.warn('[Middleware] Tentativa de acesso sem token JWT.');
         return res.status(401).json({ message: 'Não autorizado, token não fornecido.' });
     }
 
@@ -17,7 +17,7 @@ export const protect = (req: Request, res: Response, next: NextFunction) => {
         jwt.verify(token, JWT_SECRET);
         next();
     } catch (error) {
-        Logger.error('Falha na verificação do token JWT: %o', error);
+        Logger.error('[Middleware] Falha na verificação do token JWT: %o', error);
         return res.status(401).json({ message: 'Não autorizado, token inválido.' });
     }
 };

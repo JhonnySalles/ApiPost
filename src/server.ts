@@ -12,12 +12,16 @@ import path from 'path';
 import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import Logger from './config/logger';
+import './services/firebaseService';
 import authRoutes from './routes/authRoutes';
 import tumblrRoutes from './routes/tumblrRoutes';
 import twitterRoutes from './routes/twitterRoutes';
 import blueskyRoutes from './routes/blueskyRoutes';
 import threadsRoutes from './routes/threadsRoutes';
 import publishAllRoutes from './routes/publishAllRoutes';
+
+if (process.env.IGNORAR_POST)
+    Logger.warn(`🧪 Servidor configurado para teste, será ignorado os envios de posts.`);
 
 Sentry.init({
     dsn: process.env.SENTRY_DSN,
@@ -50,10 +54,10 @@ export const io = new Server(server, {
 });
 
 io.on('connection', (socket) => {
-    Logger.info(`🔌 Novo cliente conectado: ${socket.id}`);
+    Logger.info(`[Websocket]🔌 Novo cliente conectado: ${socket.id}`);
 
     socket.on('disconnect', () => {
-        Logger.info(`🔌 Cliente desconectado: ${socket.id}`);
+        Logger.info(`[Websocket]🔌 Cliente desconectado: ${socket.id}`);
     });
 });
 

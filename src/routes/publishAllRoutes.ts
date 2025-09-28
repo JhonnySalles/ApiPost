@@ -3,25 +3,29 @@ import { protect } from '../middleware/authMiddleware';
 import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { io } from '../server';
+import { BASE_DOCUMENT, db } from '../services/firebaseService';
 
 import { handleTumblrPost } from './tumblrRoutes';
 import { handleTwitterPost } from './twitterRoutes';
 import { handleBlueskyPost } from './blueskyRoutes';
 import { handleThreadsPost } from './threadsRoutes';
+import { BLUESKY, Platform, THREADS, TUMBLR, TWITTER, X } from '../constants/platforms';
 
 const router = Router();
 
 interface ImagePayload {
     base64: string;
-    platforms?: ('tumblr' | 'x' | 'twitter' | 'bluesky' | 'threads')[];
+    platforms?: Platform[];
 }
 
 interface PublishAllPayload {
-    platforms: ('tumblr' | 'x' | 'twitter' | 'bluesky' | 'threads')[];
+    platforms: Platform[];
     text?: string;
     images?: ImagePayload[];
     tags?: string[];
     socketId?: string;
+    instanceId?: string;
+    postId?: string;
     platformOptions?: {
         tumblr?: {
             blogName: string;
@@ -30,11 +34,13 @@ interface PublishAllPayload {
 }
 
 async function processPublishAllRequest(payload: PublishAllPayload) {
-    const { platforms, text, images, tags, socketId, platformOptions } = payload;
+    const { platforms, text, images, tags, socketId, platformOptions, instanceId, postId } = payload;
     const totalPlatforms = platforms.length;
 
     const successfulPlatforms: string[] = [];
     const failedPlatforms: { platform: string; reason: string }[] = [];
+
+    const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 
     Logger.info(`[Publish All] Iniciando postagem em ${totalPlatforms} plataformas (${platforms}).`);
 
@@ -50,22 +56,22 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
         try {
             Logger.info(`[Publish All] Processando plataforma: ${platform} (${i + 1}/${totalPlatforms})`);
             switch (platform) {
-                case 'tumblr':
+                case TUMBLR:
                     if (!platformOptions?.tumblr?.blogName)
                         throw new Error('blogName é obrigatório para o Tumblr.');
-                    await handleTumblrPost({ text, images: imagesPost, tags, ...platformOptions.tumblr });
+                    await handleTumblrPost({ text, images: imagesPost, tags, instanceId, postId, ...platformOptions.tumblr });
                     break;
-                case 'x':
-                case 'twitter':
+                case X:
+                case TWITTER:
                     const listX = imagesPost && imagesPost.length > 4 ? imagesPost.slice(0, 4) : imagesPost;
-                    await handleTwitterPost({ text: text || '', images: listX, tags });
+                    await handleTwitterPost({ text: text || '', images: listX, tags, instanceId, postId });
                     break;
-                case 'bluesky':
+                case BLUESKY:
                     const listBluesky = imagesPost && imagesPost.length > 4 ? imagesPost.slice(0, 4) : imagesPost;
-                    await handleBlueskyPost({ text: text || '', images: listBluesky, tags });
+                    await handleBlueskyPost({ text: text || '', images: listBluesky, tags, instanceId, postId });
                     break;
-                case 'threads':
-                    await handleThreadsPost({ text: text || '', images: imagesPost, tags });
+                case THREADS:
+                    await handleThreadsPost({ text: text || '', images: imagesPost, tags, instanceId, postId });
                     break;
                 default:
                     throw new Error(`Plataforma desconhecida: ${platform}`);
@@ -90,6 +96,23 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                 progress,
                 error: errorDetails,
             });
+        }
+    }
+
+    if (dbRef) {
+        Logger.info(`[Publish All] Gravando sumário final no Firebase para o job: ${postId}`);
+        try {
+            await dbRef.update({
+                _summary: {
+                    status: 'completed',
+                    completedAt: new Date().toISOString(),
+                    successful: successfulPlatforms,
+                    failed: failedPlatforms,
+                }
+            });
+        } catch (dbError) {
+            Logger.error(`[Publish All] Falha ao gravar sumário no Firebase para o job ${postId}:`, dbError);
+            Sentry.captureException(dbError);
         }
     }
 
@@ -127,6 +150,8 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
  *                 **Corpo da Requisição:**
  *                 * **`platforms`** (array de strings, obrigatório): Lista das plataformas onde o conteúdo será publicado. Valores válidos: `tumblr`, `twitter`, `bluesky`, `threads`.
  *                 * **`socketId`** (string, obrigatório): O ID da conexão WebSocket do cliente, usado para receber os retornos de progresso.
+ *                 * **`instanceId`** (string, opcional): ID da instância do app cliente para rastreamento no Firebase.
+ *                 * **`postId`** (string, opcional): ID do post gerado pelo app cliente para rastreamento no Firebase.
  *                 * **`text`** (string, opcional): O conteúdo de texto principal do post.
  *                 * **`images`** (array de objetos, opcional): Lista de imagens a serem publicadas.
  *                   * `base64`: A imagem no formato Data URL (`data:image/jpeg;base64,...`).
@@ -150,6 +175,13 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
  *                  type: string
  *                  enum: [tumblr, twitter, bluesky, threads]
  *                example: [tumblr, twitter, bluesky, threads]
+ *              instanceId:
+ *                type: string
+ *                description: ID da instância do app cliente para rastreamento no Firebase.
+ *                example: "asdffasdfFMaxwBvUw49LOjc2"
+ *              postId:
+ *                type: string
+ *                description: "153"
  *              text:
  *                type: string
  *                example: "Olá, mundo!"
@@ -165,6 +197,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
  *              socketId:
  *                type: string
  *                description: O ID da conexão WebSocket do cliente.
+ *                example: "RjBTZ40hhTk1T7mDAAAB"
  *              platformOptions:
  *                type: object
  *                properties:

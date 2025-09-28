@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { uploadImage } from '../services/cloudinaryService';
 import { ThreadsApiError, ThreadsAuthenticatedApiClient } from '@libs/threads-graph-api/index.js';
+import { BASE_DOCUMENT, db } from '../services/firebaseService';
 
 const router = Router();
 
@@ -11,10 +12,12 @@ interface ThreadsPostOptions {
     text?: string;
     images?: string[];
     tags?: string[];
+    instanceId?: string;
+    postId?: string;
 }
 
 export async function handleThreadsPost(options: ThreadsPostOptions) {
-    const { text, images, tags } = options;
+    const { text, images, tags, instanceId, postId } = options;
     const hasText = text && text.trim().length > 0;
     const hasImages = images && images.length > 0;
 
@@ -26,6 +29,8 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         throw new Error('Threads: Credenciais da Threads Graph API não configuradas no .env');
 
     let debugLog = 'Iniciando processo de postagem no Threads.\n';
+
+    const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 
     try {
         const client = new ThreadsAuthenticatedApiClient(THREADS_ACCESS_TOKEN, THREADS_USER_ID);
@@ -52,7 +57,10 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         }
 
         let creationId: string;
-        if (!hasImages) {
+        if (process.env.IGNORAR_POST) {
+            creationId = '1';
+            Logger.warn(`[Threads] Ignorado o envio do post.`);
+        } else if (!hasImages) {
             Logger.info('[Threads] Criando post de texto...');
             debugLog += `\nCenário: Texto Apenas.\nParâmetros para createMediaContainer:\n${JSON.stringify({ mediaType: 'TEXT', text: (text || "").replace("\t", ""), topicTag: topicTag, }, null, 2)}\n`;
             const response = await client.createMediaContainer({
@@ -106,9 +114,13 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
             }
         }
 
-        Logger.info(`[Threads] Publicando contêiner com ID: ${creationId}...`);
         debugLog += `\nParâmetros para Publicação:\n${JSON.stringify({ creationId }, null, 2)}\n`;
-        const { id: postId } = await client.publish({ creationId });
+        const { id: postId } = process.env.IGNORAR_POST ? { id: `[Tumblr] Ignorado o envio do post.` } : await client.publish({ creationId });
+
+        if (dbRef)
+            await dbRef.update({ threads: { status: 'success', error: null, } });
+
+        Logger.info(`[Threads] Publicando contêiner com sucesso! ID: ${creationId}`);
         return { success: true, data: { postId } };
     } catch (error) {
         debugLog += `\nERRO CAPTURADO: ${error instanceof Error ? error.message : String(error)}`;
@@ -121,9 +133,17 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         if (error instanceof ThreadsApiError) {
             const apiError = error.getThreadsError();
             Logger.error('[Threads] Erro da API do Threads: %s - Detalhes: %o', error.message, apiError);
+
+            if (dbRef)
+                await dbRef.update({ threads: { status: 'error', error: error.message || 'Erro ao postar no Threads.' } });
+
             throw new Error(`Erro da API do Threads: ${apiError?.error?.message || error.message}`);
         }
         Logger.error('[Threads] Erro ao postar no Threads: %o', error);
+
+        if (dbRef)
+            await dbRef.update({ threads: { status: 'error', error: (error && error instanceof Error ? error.message : 'Erro ao postar no Threads.') } });
+
         throw error;
     }
 }
@@ -144,6 +164,8 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
  *                 * **`text`** (string, opcional): O conteúdo do post, que servirá como legenda para posts com imagem/carrossel.
  *                 * **`images`** (array, opcional): Uma lista de imagens no formato Data URL (base64). As imagens são primeiro enviadas para um serviço de hospedagem (Cloudinary) para gerar URLs públicas.
  *                 * **`tags`** (array, opcional): Apenas a **primeira tag** da lista será usada como `topic_tag` ou adicionada como hashtag, de acordo com as regras da API do Threads para cada tipo de post.
+ *                 * **`instanceId`** (string, opcional): ID da instância do app cliente para rastreamento no Firebase.
+ *                 * **`postId`** (string, opcional): ID do post gerado pelo app cliente para rastreamento no Firebase.
  *                 
  *                 **Corpo da Resposta:**
  *                 * Retorna um objeto com o ID do post criado com sucesso (status `201 Created`).
@@ -162,19 +184,33 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
  *                  text: { type: string }
  *                  images: { type: array, items: { type: base64 } }
  *                  tags: { type: array, items: { type: string } }
+ *                  instanceId: { type: string }
+ *                  postId: { type: string }
  *          example:
  *            text: "Este é um tweet de exemplo!"
  *            tags: ["api", "teste"]
  *            images: ["data:image/png;base64,iVBORw0KGgo..."]
+ *            instanceId: "asdffasdfFMaxwBvUw49LOjc2"
+ *            postId: "153"
  *    responses:
  *      '201':
  *        description: Post criado com sucesso.
  */
 router.post('/post', protect, async (req: Request, res: Response) => {
+    const { instanceId, postId } = req.body;
+    const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
+
     try {
         const result = await handleThreadsPost(req.body);
+        ;
+        if (dbRef)
+            await dbRef.update({ threads: { status: 'success', error: null, } });
+
         res.status(201).json({ message: 'Post criado com sucesso!', ...result });
     } catch (error: any) {
+        if (dbRef)
+            await dbRef.update({ threads: { status: 'error', error: error.message || 'Erro ao postar no Threads.' } });
+
         res.status(500).json({ message: error.message || 'Erro ao postar no Threads.' });
     }
 });
