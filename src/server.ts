@@ -73,8 +73,13 @@ const swaggerFilePath = path.join(process.cwd(), 'swagger-spec.yaml');
 const swaggerFileContent = fs.readFileSync(swaggerFilePath, 'utf8');
 const swaggerDocs = yaml.load(swaggerFileContent) as object;
 
+app.get('/api-docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerDocs);
+});
+
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-app.get(['/swagger-ui.html', '/docs', '/documentacao', '/'], (req, res) => {
+app.get(['/swagger-ui.html', '/docs', '/documentacao'], (req, res) => {
     res.redirect('/api-docs');
 });
 
@@ -102,7 +107,7 @@ app.get(['/swagger-ui.html', '/docs', '/documentacao', '/'], (req, res) => {
  *         description: Sucesso.
  */
 app.get('/health', (req, res) => {
-    res.send('A API está funcionando! Acesse /api-docs para ver a documentação.');
+    res.send('A API está funcionando! Acesse /api-docs para ver a documentação, ou /api-docs.json para o json.');
 });
 
 app.use('/auth', authRoutes);
