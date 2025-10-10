@@ -4,6 +4,7 @@ import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
+import { toTitleCase } from '../utils/textUtils.js';
 import sharp from 'sharp';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
 
@@ -55,7 +56,7 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
 
         let finalText = text || '';
         if (tags && tags.length > 0) {
-            const hashtags = tags.map(tag => `#${tag.replace(/ /g, '')}`).join(' ');
+            const hashtags = tags.filter(tag => tag && tag.trim() !== '').map(tag => `#${toTitleCase(tag).replace(/[\s-]/g, '')}`).join(' ');
             finalText = finalText ? `${finalText}\n\n${hashtags}` : hashtags;
         }
 

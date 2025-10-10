@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { uploadImage } from '../services/cloudinaryService';
 import { ThreadsApiError, ThreadsAuthenticatedApiClient } from '@libs/threads-graph-api/index.js';
+import { toTitleCase } from '../utils/textUtils.js';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
 
 const router = Router();
@@ -36,23 +37,20 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         const client = new ThreadsAuthenticatedApiClient(THREADS_ACCESS_TOKEN, THREADS_USER_ID);
 
         let topicTag: string | undefined = undefined;
-        const firstTag = tags && tags.length > 0 ? tags[0] : undefined;
+        if (tags && tags.length > 0) {
+            const firstTag = tags.find(tag => tag && tag.trim() !== '');
 
-        if (firstTag) {
-            let cleanedTag = firstTag.replace(/[.&@!?,;:]/g, '');
-            const isNumeric = cleanedTag.trim() && !isNaN(Number(cleanedTag.replace(/ /g, '')));
+            if (firstTag) {
+                let processedTag = toTitleCase(firstTag).replace(/[\s-]/g, '');
+                processedTag = processedTag.replace(/[.&@!?,;:]/g, '');
+                const isNumeric = processedTag.trim() && !isNaN(Number(processedTag));
 
-            if (cleanedTag.trim() && !isNumeric) {
-                if (cleanedTag.length > 50) {
-                    const truncated = cleanedTag.substring(0, 50);
-                    const lastSpaceIndex = truncated.lastIndexOf(' ');
-                    if (lastSpaceIndex > 0)
-                        topicTag = truncated.substring(0, lastSpaceIndex);
+                if (processedTag.trim() && !isNumeric) {
+                    if (processedTag.length > 50)
+                        topicTag = processedTag.substring(0, 50);
                     else
-                        topicTag = truncated;
-                } else
-                    topicTag = cleanedTag;
-                topicTag = topicTag.trim();
+                        topicTag = processedTag;
+                }
             }
         }
 
@@ -130,16 +128,37 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
             },
         });
 
+        try {
+            Logger.info('[Firebase] Gravando log de erro detalhado...');
+            const errorLogRef = db.ref('post_errors');
+            await errorLogRef.push({
+                timestamp: new Date().toISOString(),
+                platform: 'threads',
+                errorMessage: error,
+                fullError: JSON.parse(JSON.stringify(error, Object.getOwnPropertyNames(error))),
+                debugTrace: debugLog,
+                postId: postId || null,
+            });
+            Logger.info('[Firebase] Log de erro gravado com sucesso.');
+        } catch (dbError) {
+            Logger.error('[Firebase] Falha CRÍTICA ao gravar o log de erro no Firebase:', dbError);
+            Sentry.captureException(dbError);
+        }
+
         if (error instanceof ThreadsApiError) {
             const apiError = error.getThreadsError();
-            Logger.error('[Threads] Erro da API do Threads: %s - Detalhes: %o', error.message, apiError);
+            Logger.error('[Threads] Erro da API do Threads: %s - Detalhes: %o -- Debug: %o', error.message, apiError, {
+                threadsDebugLog: debugLog
+            });
 
             if (dbRef)
                 await dbRef.update({ threads: { status: 'error', error: error.message || 'Erro ao postar no Threads.' } });
 
             throw new Error(`Erro da API do Threads: ${apiError?.error?.message || error.message}`);
         }
-        Logger.error('[Threads] Erro ao postar no Threads: %o', error);
+        Logger.error('[Threads] Erro ao postar no Threads: %o -- Debug: %o', error, {
+            threadsDebugLog: debugLog
+        });
 
         if (dbRef)
             await dbRef.update({ threads: { status: 'error', error: (error && error instanceof Error ? error.message : 'Erro ao postar no Threads.') } });

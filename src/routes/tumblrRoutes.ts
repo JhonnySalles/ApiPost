@@ -107,9 +107,10 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
         if (process.env.IGNORAR_POST)
             Logger.warn(`[Tumblr] Ignorado o envio do post.`);
 
+        const filteredTags = tags?.filter(tag => tag && tag.trim() !== '');
         const responseData = process.env.IGNORAR_POST ? { message: `[Tumblr] Ignorado o envio do post.` } : await tumblrClient.createPost(blogName, {
             content: contentBlocks,
-            tags: tags,
+            tags: filteredTags,
         });
 
         if (dbRef)
