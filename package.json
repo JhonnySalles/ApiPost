@@ -9,7 +9,7 @@
     "dev": "cross-env GOOGLE_APPLICATION_CREDENTIALS=./firebase-service-account.json ts-node-dev -r tsconfig-paths/register --respawn --transpile-only --ignore-watch node_modules src/server.ts",
     "docs:generate": "swagger-jsdoc -d swaggerDef.js -o swagger-spec.yaml \"./src/**/*.ts\"",
     "build": "yarn docs:generate && tsc",
-    "start": "node -r tsconfig-paths/register dist/server.js",
+    "start": "cross-env GOOGLE_APPLICATION_CREDENTIALS=./firebase-service-account.json node -r tsconfig-paths/register dist/server.js",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\""

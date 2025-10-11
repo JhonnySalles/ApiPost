@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { uploadImage } from '../services/cloudinaryService';
 import { ThreadsApiError, ThreadsAuthenticatedApiClient } from '@libs/threads-graph-api/index.js';
-import { toTitleCase } from '../utils/textUtils.js';
+import { toTitleCase } from '../utils/texts.js';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
 
 const router = Router();
@@ -58,6 +58,12 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         if (process.env.IGNORAR_POST) {
             creationId = '1';
             Logger.warn(`[Threads] Ignorado o envio do post.`);
+            await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
+
+            if (Math.random() < 0.3) {
+                Logger.warn(`[Threads] Simulando uma falha (30% de chance).`);
+                throw new Error('Teste de excessão');
+            }
         } else if (!hasImages) {
             Logger.info('[Threads] Criando post de texto...');
             const response = await client.createMediaContainer({
@@ -217,15 +223,8 @@ router.post('/post', protect, async (req: Request, res: Response) => {
 
     try {
         const result = await handleThreadsPost(req.body);
-        ;
-        if (dbRef)
-            await dbRef.update({ threads: { status: 'success', error: null, } });
-
         res.status(201).json({ message: 'Post criado com sucesso!', ...result });
     } catch (error: any) {
-        if (dbRef)
-            await dbRef.update({ threads: { status: 'error', error: error.message || 'Erro ao postar no Threads.' } });
-
         res.status(500).json({ message: error.message || 'Erro ao postar no Threads.' });
     }
 });

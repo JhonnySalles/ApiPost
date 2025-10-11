@@ -104,8 +104,15 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
             }
         }
 
-        if (process.env.IGNORAR_POST)
+        if (process.env.IGNORAR_POST) {
             Logger.warn(`[Tumblr] Ignorado o envio do post.`);
+            await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
+
+            if (Math.random() < 0.3) {
+                Logger.warn(`[Tumblr] Simulando uma falha (30% de chance).`);
+                throw new Error('Teste de excessão');
+            }
+        }
 
         const filteredTags = tags?.filter(tag => tag && tag.trim() !== '');
         const responseData = process.env.IGNORAR_POST ? { message: `[Tumblr] Ignorado o envio do post.` } : await tumblrClient.createPost(blogName, {
@@ -185,15 +192,8 @@ router.post('/post', protect, async (req: Request, res: Response) => {
 
     try {
         const result = await handleTumblrPost(req.body);
-
-        if (dbRef)
-            await dbRef.update({ tumblr: { status: 'success', error: null, } });
-
         res.status(201).json({ message: 'Post criado com sucesso!', ...result });
     } catch (error: any) {
-        if (dbRef)
-            await dbRef.update({ tumblr: { status: 'error', error: error.message || 'Erro ao postar no Tumblr.' } });
-
         res.status(500).json({ message: error.message || 'Erro ao postar no Tumblr.' });
     }
 });

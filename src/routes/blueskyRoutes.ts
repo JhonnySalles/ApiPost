@@ -4,7 +4,7 @@ import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
-import { toTitleCase } from '../utils/textUtils.js';
+import { toTitleCase } from '../utils/texts.js';
 import sharp from 'sharp';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
 
@@ -62,9 +62,15 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
 
         const postEmbeds = [];
 
-        if (process.env.IGNORAR_POST)
+        if (process.env.IGNORAR_POST) {
             Logger.warn(`[Bluesky] Ignorado o envio do post.`);
-        else if (images && images.length > 0) {
+            await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
+
+            if (Math.random() < 0.3) {
+                Logger.warn(`[Bluesky] Simulando uma falha (30% de chance).`);
+                throw new Error('Teste de excessão');
+            }
+        } else if (images && images.length > 0) {
             Logger.info('[Bluesky] Fazendo upload de imagens para o Bluesky, com otimização...');
             for (const imageDataUrl of images) {
                 const parsedImage = parseDataUrl(imageDataUrl);
@@ -181,15 +187,8 @@ router.post('/post', protect, async (req: Request, res: Response) => {
 
     try {
         const result = await handleBlueskyPost(req.body);
-
-        if (dbRef)
-            await dbRef.update({ bluesky: { status: 'success', error: null, } });
-
         res.status(201).json({ message: 'Post criado com sucesso!', ...result });
     } catch (error: any) {
-        if (dbRef)
-            await dbRef.update({ bluesky: { status: 'error', error: error.message || 'Erro ao postar no Bluesky.' } });
-
         res.status(500).json({ message: error.message || 'Erro ao postar no Bluesky.' });
     }
 });

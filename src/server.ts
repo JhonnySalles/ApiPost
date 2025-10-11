@@ -62,7 +62,7 @@ io.on('connection', (socket) => {
 });
 
 server.listen(port, 0, () => {
-    console.log(`Servidor escutando em 0.0.0.0 na porta ${port}`);
+    Logger.info(`👂 Servidor escutando em 0.0.0.0 na porta ${port}`);
 });
 
 //app.use(Sentry.expressRequestHandler());

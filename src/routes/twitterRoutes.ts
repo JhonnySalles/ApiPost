@@ -4,7 +4,7 @@ import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
-import { toTitleCase } from '../utils/textUtils.js';
+import { toTitleCase } from '../utils/texts.js';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
 
 const router = Router();
@@ -49,9 +49,15 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
 
         const mediaIds: string[] = [];
 
-        if (process.env.IGNORAR_POST)
+        if (process.env.IGNORAR_POST) {
             Logger.warn(`[Twitter] Ignorado o envio do post.`);
-        else if (images && images.length > 0) {
+            await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
+
+            if (Math.random() < 0.3) {
+                Logger.warn(`[Twitter] Simulando uma falha (30% de chance).`);
+                throw new Error('Teste de excessão');
+            }
+        } else if (images && images.length > 0) {
             Logger.info('Fazendo upload de imagens para o Twitter...');
             for (const imageDataUrl of images) {
                 const parsedImage = parseDataUrl(imageDataUrl);
@@ -146,15 +152,8 @@ router.post('/post', protect, async (req: Request, res: Response) => {
 
     try {
         const result = await handleTwitterPost(req.body);
-
-        if (dbRef)
-            await dbRef.update({ twitter: { status: 'success', error: null, } });
-
         res.status(201).json({ message: 'Tweet criado com sucesso!', ...result });
     } catch (error: any) {
-        if (dbRef)
-            await dbRef.update({ twitter: { status: 'error', error: error.message || 'Erro ao postar no Twitter.' } });
-
         res.status(500).json({ message: error.message || 'Erro ao postar no Twitter.' });
     }
 });
