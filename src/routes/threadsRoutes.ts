@@ -29,7 +29,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
     if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID)
         throw new Error('Threads: Credenciais da Threads Graph API não configuradas no .env');
 
-    let debugLog = 'Iniciando processo de postagem no Threads.\n';
+    let debugLog = '';
 
     const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 
@@ -60,7 +60,6 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
             Logger.warn(`[Threads] Ignorado o envio do post.`);
         } else if (!hasImages) {
             Logger.info('[Threads] Criando post de texto...');
-            debugLog += `\nCenário: Texto Apenas.\nParâmetros para createMediaContainer:\n${JSON.stringify({ mediaType: 'TEXT', text: (text || "").replace("\t", ""), topicTag: topicTag, }, null, 2)}\n`;
             const response = await client.createMediaContainer({
                 mediaType: 'TEXT',
                 text: (text || "").replace("\t", ""),
@@ -74,7 +73,6 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
 
             if (imageUrls.length === 1) {
                 Logger.info('[Threads] Criando post de imagem única...');
-                debugLog += `\nCenário: Imagem Única.\nParâmetros para createMediaContainer:\n${JSON.stringify({ mediaType: 'IMAGE', text: text ? text.replace("\t", "") : undefined, imageUrl: imageUrls[0], topicTag: topicTag, }, null, 2)}\n`;
                 const response = await client.createMediaContainer({
                     mediaType: 'IMAGE',
                     text: text ? text.replace("\t", "") : undefined,
@@ -84,7 +82,6 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
                 creationId = response.id;
             } else {
                 Logger.info('[Threads] Criando contêineres de itens para o carrossel...');
-                debugLog += `\nCenário: Carrossel.\nParâmetros para os contêineres dos itens:\n${JSON.stringify(imageUrls.map(url => ({ mediaType: 'IMAGE', imageUrl: url, isCarouselItem: true })), null, 2)}\n`;
                 const itemContainerIds = await Promise.all(
                     imageUrls.map(url =>
                         client.createMediaContainer({
@@ -112,7 +109,6 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
             }
         }
 
-        debugLog += `\nParâmetros para Publicação:\n${JSON.stringify({ creationId }, null, 2)}\n`;
         const { id: postId } = process.env.IGNORAR_POST ? { id: `[Tumblr] Ignorado o envio do post.` } : await client.publish({ creationId });
 
         if (dbRef)
