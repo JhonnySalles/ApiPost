@@ -85,25 +85,26 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
 
     const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 
-    try {
-        const contentBlocks: any[] = [];
+    const contentBlocks: any[] = [];
+    if (text)
+        contentBlocks.push({ type: 'text', text: text });
 
-        if (text)
-            contentBlocks.push({ type: 'text', text: text });
-
-        if (images && images.length > 0) {
-            for (const [index, imageDataUrl] of images.entries()) {
-                const parsedImage = parseDataUrl(imageDataUrl);
-                if (parsedImage) {
-                    const imageBuffer = Buffer.from(parsedImage.data, 'base64');
-                    contentBlocks.push({
-                        type: 'image',
-                        media: imageBuffer,
-                    });
-                }
+    if (images && images.length > 0) {
+        for (const imageDataUrl of images) {
+            const parsedImage = parseDataUrl(imageDataUrl);
+            if (parsedImage) {
+                const imageBuffer = Buffer.from(parsedImage.data, 'base64');
+                contentBlocks.push({
+                    type: 'image',
+                    media: imageBuffer,
+                });
             }
         }
+    }
 
+    const filteredTags = tags?.filter(tag => tag && tag.trim() !== '');
+
+    try {
         if (process.env.IGNORAR_POST) {
             Logger.warn(`[Tumblr] Ignorado o envio do post.`);
             await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
@@ -114,7 +115,6 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
             }
         }
 
-        const filteredTags = tags?.filter(tag => tag && tag.trim() !== '');
         const responseData = process.env.IGNORAR_POST ? { message: `[Tumblr] Ignorado o envio do post.` } : await tumblrClient.createPost(blogName, {
             content: contentBlocks,
             tags: filteredTags,
@@ -125,12 +125,42 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
 
         Logger.info(`[Tumblr] Post criado no Tumblr com sucesso para o blog ${blogName}`);
         return { success: true, data: responseData };
-    } catch (error) {
-        Logger.error(`[Tumblr] Erro ao postar no Tumblr no blog ${blogName}: %o`, error);
-        Sentry.captureException(error, { extra: { blogName } });
+    } catch (error: any) {
+        if (error && error.statusCode === 403) {
+            Logger.warn(`[Tumblr] Limite de postagem diária atingido para o blog ${blogName}. Tentando salvar como rascunho agendado.`);
 
-        if (dbRef)
-            await dbRef.update({ tumblr: { status: 'error', error: (error && error instanceof Error ? error.message : 'Erro ao postar no Tumblr.') } });
+            const publishDate = new Date();
+            publishDate.setHours(publishDate.getHours() + 24);
+
+            try {
+                const responseData = await tumblrClient.createPost(blogName, {
+                    content: contentBlocks,
+                    tags: filteredTags,
+                    state: 'queue',
+                    publish_on: publishDate.toISOString(),
+                });
+
+                if (dbRef)
+                    await dbRef.update({ tumblr: { status: 'scheduled', error: null, publishTime: publishDate.toISOString() } });
+
+                Logger.info(`[Tumblr] Post salvo como rascunho e agendado para ${publishDate.toISOString()} no blog ${blogName}`);
+                return { success: true, data: responseData, scheduled: true, publishTime: publishDate.toISOString() };
+            } catch (draftError: any) {
+                Logger.error(`[Tumblr] Falha ao salvar o rascunho agendado no blog ${blogName}: %o`, draftError);
+                Sentry.captureException(draftError, { extra: { blogName, originalError: error } });
+
+                if (dbRef)
+                    await dbRef.update({ tumblr: { status: 'error', error: (draftError && draftError.message) ? draftError.message : 'Erro ao salvar rascunho no Tumblr.' } });
+
+                throw draftError;
+            }
+        } else {
+            Logger.error(`[Tumblr] Erro ao postar no Tumblr no blog ${blogName}: %o`, error);
+            Sentry.captureException(error, { extra: { blogName } });
+
+            if (dbRef)
+                await dbRef.update({ tumblr: { status: 'error', error: (error && error.message) ? error.message : 'Erro ao postar no Tumblr.' } });
+        }
 
         throw error;
     }
@@ -183,16 +213,16 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
  *            instanceId: "asdffasdfFMaxwBvUw49LOjc2"
  *            postId: "153"
  *    responses:
- *      '201':
+ *      '200':
  *        description: Post criado com sucesso.
+ *      '201':
+ *        description: Rascunho agendado com sucesso.
  */
 router.post('/post', protect, async (req: Request, res: Response) => {
-    const { instanceId, postId } = req.body;
-    const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
-
     try {
         const result = await handleTumblrPost(req.body);
-        res.status(201).json({ message: 'Post criado com sucesso!', ...result });
+        const status = result.scheduled ? 201 : 200;
+        res.status(status).json({ message: 'Post criado com sucesso!', ...result });
     } catch (error: any) {
         res.status(500).json({ message: error.message || 'Erro ao postar no Tumblr.' });
     }

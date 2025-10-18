@@ -225,7 +225,7 @@ paths:
               instanceId: asdffasdfFMaxwBvUw49LOjc2
               postId: "153"
       responses:
-        "201":
+        "200":
           description: Post criado com sucesso.
   /publish-all/post:
     post:
@@ -411,7 +411,7 @@ paths:
               instanceId: asdffasdfFMaxwBvUw49LOjc2
               postId: "153"
       responses:
-        "201":
+        "200":
           description: Post criado com sucesso.
   /tumblr/blogs:
     get:
@@ -523,8 +523,10 @@ paths:
               instanceId: asdffasdfFMaxwBvUw49LOjc2
               postId: "153"
       responses:
-        "201":
+        "200":
           description: Post criado com sucesso.
+        "201":
+          description: Rascunho agendado com sucesso.
   /twitter/post:
     post:
       summary: Cria um novo tweet.
@@ -588,7 +590,7 @@ paths:
               instanceId: asdffasdfFMaxwBvUw49LOjc2
               postId: "153"
       responses:
-        "201":
+        "200":
           description: Tweet criado com sucesso.
   /health:
     get:

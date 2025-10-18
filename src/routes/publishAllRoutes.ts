@@ -47,8 +47,9 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
     for (let i = 0; i < totalPlatforms; i++) {
         const platform = platforms[i];
         const progress = Math.round(((i + 1) / totalPlatforms) * 100);
-        let status: 'success' | 'error' = 'success';
+        let status: 'success' | 'scheduled' | 'error' = 'success';
         let errorDetails: string | null = null;
+        let publishTime: string | undefined = undefined;
 
         const imagesPost = images?.filter(image => !image.platforms || image.platforms.length === 0 || image.platforms.includes(platform))
             .map(image => image.base64);
@@ -59,26 +60,27 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                 case TUMBLR:
                     if (!platformOptions?.tumblr?.blogName)
                         throw new Error('blogName é obrigatório para o Tumblr.');
-                    await handleTumblrPost({ text, images: imagesPost, tags, instanceId, postId, ...platformOptions.tumblr });
+                    const result = await handleTumblrPost({ text, images: imagesPost, tags, instanceId, postId, ...platformOptions.tumblr });
+                    publishTime = result.publishTime;
+                    status = result.scheduled ? 'scheduled' : (result.success ? 'success' : 'error');
                     break;
                 case X:
                 case TWITTER:
                     const listX = imagesPost && imagesPost.length > 4 ? imagesPost.slice(0, 4) : imagesPost;
-                    await handleTwitterPost({ text: text || '', images: listX, tags, instanceId, postId });
+                    status = await handleTwitterPost({ text: text || '', images: listX, tags, instanceId, postId }) ? 'success' : 'error';
                     break;
                 case BLUESKY:
                     const listBluesky = imagesPost && imagesPost.length > 4 ? imagesPost.slice(0, 4) : imagesPost;
-                    await handleBlueskyPost({ text: text || '', images: listBluesky, tags, instanceId, postId });
+                    status = await handleBlueskyPost({ text: text || '', images: listBluesky, tags, instanceId, postId }) ? 'success' : 'error';
                     break;
                 case THREADS:
-                    await handleThreadsPost({ text: text || '', images: imagesPost, tags, instanceId, postId });
+                    status = await handleThreadsPost({ text: text || '', images: imagesPost, tags, instanceId, postId }) ? 'success' : 'error';
                     break;
                 default:
                     throw new Error(`Plataforma desconhecida: ${platform}`);
             }
             Logger.info(`[Publish All] Sucesso ao postar em: ${platform}`);
 
-            await new Promise(resolve => setTimeout(resolve, 3000));
             successfulPlatforms.push(platform);
         } catch (error: any) {
             status = 'error';
@@ -95,6 +97,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                 status,
                 progress,
                 error: errorDetails,
+                publishTime,
             });
         }
     }

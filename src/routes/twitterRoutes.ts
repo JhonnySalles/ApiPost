@@ -4,7 +4,7 @@ import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
-import { toTitleCase } from '../utils/texts.js';
+import { toTitleCase } from '../utils/texts';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
 
 const router = Router();
@@ -143,16 +143,13 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
  *            instanceId: "asdffasdfFMaxwBvUw49LOjc2"
  *            postId: "153"
  *    responses:
- *      '201':
+ *      '200':
  *        description: Tweet criado com sucesso.
  */
 router.post('/post', protect, async (req: Request, res: Response) => {
-    const { instanceId, postId } = req.body;
-    const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
-
     try {
         const result = await handleTwitterPost(req.body);
-        res.status(201).json({ message: 'Tweet criado com sucesso!', ...result });
+        res.status(200).json({ message: 'Tweet criado com sucesso!', ...result });
     } catch (error: any) {
         res.status(500).json({ message: error.message || 'Erro ao postar no Twitter.' });
     }
