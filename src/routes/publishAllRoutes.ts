@@ -4,6 +4,7 @@ import Logger from '../config/logger';
 import * as Sentry from '@sentry/node';
 import { io } from '../server';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
+import { uploadImage } from '../services/cloudinaryService';
 
 import { handleTumblrPost } from './tumblrRoutes';
 import { handleTwitterPost } from './twitterRoutes';
@@ -44,6 +45,19 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
 
     Logger.info(`[Publish All] Iniciando postagem em ${totalPlatforms} plataformas (${platforms}).`);
 
+    let imagesUrls: string[] | undefined = undefined;
+
+    if (images && images.length > 0 && (platforms.includes(TUMBLR) || platforms.includes(THREADS))) {
+        try {
+            Logger.info(`[Publish All] Fazendo upload de ${images.length} imagem(ns) para o Cloudinary...`);
+            const allImagesBase64 = images.map(img => img.base64);
+            imagesUrls = await Promise.all(allImagesBase64.map(base64 => uploadImage(base64)));
+        } catch (error: any) {
+            Logger.error(`[Publish All] Falha crítica no upload para o Cloudinary: ${error.message}`);
+            Sentry.captureException(error);
+        }
+    }
+
     for (let i = 0; i < totalPlatforms; i++) {
         const platform = platforms[i];
         const progress = Math.round(((i + 1) / totalPlatforms) * 100);
@@ -51,8 +65,8 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
         let errorDetails: string | null = null;
         let publishTime: string | undefined = undefined;
 
-        const imagesPost = images?.filter(image => !image.platforms || image.platforms.length === 0 || image.platforms.includes(platform))
-            .map(image => image.base64);
+        const imagesPost = images?.filter(image => !image.platforms || image.platforms.length === 0 || image.platforms.includes(platform)).map(image => image.base64);
+        const urlsPost = (imagesUrls && (platform === TUMBLR || platform === THREADS)) ? images?.map((image, index) => ({ ...image, url: imagesUrls[index] })).filter(image => !image.platforms || image.platforms.length === 0 || image.platforms.includes(platform)).map(image => image.url) : undefined;
 
         try {
             Logger.info(`[Publish All] Processando plataforma: ${platform} (${i + 1}/${totalPlatforms})`);
@@ -60,7 +74,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                 case TUMBLR:
                     if (!platformOptions?.tumblr?.blogName)
                         throw new Error('blogName é obrigatório para o Tumblr.');
-                    const result = await handleTumblrPost({ text, images: imagesPost, tags, instanceId, postId, ...platformOptions.tumblr });
+                    const result = await handleTumblrPost({ text, images: imagesPost, urls: urlsPost, tags, instanceId, postId, ...platformOptions.tumblr });
                     publishTime = result.publishTime;
                     status = result.scheduled ? 'scheduled' : (result.success ? 'success' : 'error');
                     break;
@@ -74,7 +88,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                     status = await handleBlueskyPost({ text: text || '', images: listBluesky, tags, instanceId, postId }) ? 'success' : 'error';
                     break;
                 case THREADS:
-                    status = await handleThreadsPost({ text: text || '', images: imagesPost, tags, instanceId, postId }) ? 'success' : 'error';
+                    status = await handleThreadsPost({ text: text || '', images: imagesPost, urls: urlsPost, tags, instanceId, postId }) ? 'success' : 'error';
                     break;
                 default:
                     throw new Error(`Plataforma desconhecida: ${platform}`);

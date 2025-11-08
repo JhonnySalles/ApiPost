@@ -69,18 +69,19 @@ interface TumblrPostOptions {
     blogName: string;
     text?: string;
     images?: string[];
+    urls?: string[];
     tags?: string[];
     instanceId?: string;
     postId?: string;
 }
 
 export async function handleTumblrPost(options: TumblrPostOptions) {
-    const { blogName, text, images, tags, instanceId, postId } = options;
+    const { blogName, text, images, urls, tags, instanceId, postId } = options;
 
     if (!blogName)
         throw new Error(`Tumblr: O nome do blog (blogName) é obrigatório para o Tumblr.`);
 
-    if (!text && (!images || images.length === 0))
+    if (!text && (!images || images.length === 0) && (!urls || urls.length === 0))
         throw new Error(`Tumblr: É necessário fornecer texto ou imagens.`);
 
     const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
@@ -89,7 +90,10 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
     if (text)
         contentBlocks.push({ type: 'text', text: text });
 
-    if (images && images.length > 0) {
+    if (urls && urls.length > 0) {
+        for (const url of urls)
+            contentBlocks.push({ type: 'image', media: { url } });
+    } else if (images && images.length > 0) {
         for (const imageDataUrl of images) {
             const parsedImage = parseDataUrl(imageDataUrl);
             if (parsedImage) {

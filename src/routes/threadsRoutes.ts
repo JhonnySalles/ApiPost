@@ -12,15 +12,16 @@ const router = Router();
 interface ThreadsPostOptions {
     text?: string;
     images?: string[];
+    urls?: string[];
     tags?: string[];
     instanceId?: string;
     postId?: string;
 }
 
 export async function handleThreadsPost(options: ThreadsPostOptions) {
-    const { text, images, tags, instanceId, postId } = options;
+    const { text, images, urls, tags, instanceId, postId } = options;
     const hasText = text && text.trim().length > 0;
-    const hasImages = images && images.length > 0;
+    const hasImages = (images && images.length > 0) || (urls && urls.length > 0);
 
     if (!hasText && !hasImages)
         throw new Error('Threads: É necessário fornecer texto ou imagens para o Threads.');
@@ -72,10 +73,13 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
                 topicTag: topicTag,
             });
             creationId = response.id;
-
         } else {
-            Logger.info(`[Threads] Fazendo upload de ${images.length} imagem(ns) para o Cloudinary...`);
-            const imageUrls = await Promise.all(images.map(base64 => uploadImage(base64)));
+            let imageUrls: string[] = urls || [];
+
+            if (imageUrls.length === 0 && images && images.length > 0) {
+                Logger.info(`[Threads] Fazendo upload de ${images.length} imagem(ns) para o Cloudinary...`);
+                imageUrls = await Promise.all(images.map(base64 => uploadImage(base64)));
+            }
 
             if (imageUrls.length === 1) {
                 Logger.info('[Threads] Criando post de imagem única...');
