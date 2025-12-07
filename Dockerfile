@@ -3,14 +3,11 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Adiciona dependências para o 'sharp'
-RUN apk add --no-cache vips-dev python3 make g++
+RUN apk add --no-cache python3 build-base pkgconfig vips-dev
 
 COPY package.json yarn.lock ./
 
 COPY patches ./patches
-
-# Instala o node-gyp globalmente para permitir a compilação do sharp
-RUN npm install -g node-gyp
 
 # Instala TODAS as dependências. O script 'postinstall' rodará aqui,
 # aplicando o patch do tumblr.js na pasta node_modules deste estágio.
