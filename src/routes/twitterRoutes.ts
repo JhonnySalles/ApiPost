@@ -6,7 +6,7 @@ import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
 import { toTitleCase } from '../utils/texts';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
-import { ValidationError } from 'errors/ValidationError';
+import { ValidationError } from '../errors/ValidationError';
 
 const router = Router();
 

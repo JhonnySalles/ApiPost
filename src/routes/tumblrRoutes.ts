@@ -5,7 +5,7 @@ import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
-import { ValidationError } from 'errors/ValidationError';
+import { ValidationError } from '../errors/ValidationError';
 
 const router = Router();
 

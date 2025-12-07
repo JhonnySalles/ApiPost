@@ -6,7 +6,7 @@ import { uploadImage } from '../services/cloudinaryService';
 import { ThreadsApiError, ThreadsAuthenticatedApiClient } from '@libs/threads-graph-api/index.js';
 import { toTitleCase } from '../utils/texts';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
-import { ValidationError } from 'errors/ValidationError';
+import { ValidationError } from '../errors/ValidationError';
 
 const router = Router();
 

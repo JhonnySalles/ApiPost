@@ -1,6 +1,6 @@
 import admin from 'firebase-admin';
 import Logger from '../config/logger';
-import { ValidationError } from 'errors/ValidationError';
+import { ValidationError } from '../errors/ValidationError';
 
 export const BASE_DOCUMENT = 'post_status';
 

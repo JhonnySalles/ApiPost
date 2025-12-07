@@ -11,7 +11,7 @@ import { handleTwitterPost } from './twitterRoutes';
 import { handleBlueskyPost } from './blueskyRoutes';
 import { handleThreadsPost } from './threadsRoutes';
 import { BLUESKY, Platform, THREADS, TUMBLR, TWITTER, X } from '../constants/platforms';
-import { ValidationError } from 'errors/ValidationError';
+import { ValidationError } from '../errors/ValidationError';
 
 const router = Router();
 
