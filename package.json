@@ -36,6 +36,7 @@
     "inquirer": "^12.9.4",
     "js-yaml": "^4.1.0",
     "jsonwebtoken": "^9.0.2",
+    "node-addon-api": "^8.5.0",
     "sharp": "^0.34.3",
     "socket.io": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
