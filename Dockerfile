@@ -9,6 +9,9 @@ COPY package.json yarn.lock ./
 
 COPY patches ./patches
 
+# Instala o node-gyp globalmente para permitir a compilação do sharp
+RUN npm install -g node-gyp
+
 # Instala TODAS as dependências. O script 'postinstall' rodará aqui,
 # aplicando o patch do tumblr.js na pasta node_modules deste estágio.
 RUN yarn install
