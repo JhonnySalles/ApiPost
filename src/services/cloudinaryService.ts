@@ -21,6 +21,6 @@ export async function uploadImage(base64Image: string): Promise<string> {
         return result.secure_url;
     } catch (error) {
         Logger.error('[Cloudinary] Erro ao fazer upload para o Cloudinary: %o', error);
-        throw new Error('Falha no upload da imagem para o serviço de hospedagem.');
+        throw new Error(`Falha no upload da imagem para o serviço de hospedagem: ${error instanceof Error ? error.message : String(error)}`);
     }
 }

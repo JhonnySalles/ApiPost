@@ -6,6 +6,7 @@ import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
 import { toTitleCase } from '../utils/texts';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
+import { ValidationError } from 'errors/ValidationError';
 
 const router = Router();
 
@@ -22,10 +23,10 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
     const { text, images, tags, instanceId, postId } = options;
 
     if (!text && (!images || images.length === 0))
-        throw new Error('Twitter: É necessário fornecer texto ou imagens.');
+        throw new ValidationError('Twitter: É necessário fornecer texto ou imagens.');
 
     if (images && images.length > 4)
-        throw new Error('Twitter: É permitido no máximo 4 imagens por tweet.');
+        throw new ValidationError('Twitter: É permitido no máximo 4 imagens por tweet.');
 
     const {
         TWITTER_APP_KEY,
@@ -35,7 +36,7 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
     } = process.env;
 
     if (!TWITTER_APP_KEY || !TWITTER_APP_SECRET || !TWITTER_ACCESS_TOKEN || !TWITTER_ACCESS_SECRET)
-        throw new Error('Twitter: As 4 chaves do Twitter (OAuth 1.0a) não estão configuradas no .env');
+        throw new ValidationError('Twitter: As 4 chaves do Twitter (OAuth 1.0a) não estão configuradas no .env');
 
     const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 

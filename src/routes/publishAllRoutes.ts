@@ -11,6 +11,7 @@ import { handleTwitterPost } from './twitterRoutes';
 import { handleBlueskyPost } from './blueskyRoutes';
 import { handleThreadsPost } from './threadsRoutes';
 import { BLUESKY, Platform, THREADS, TUMBLR, TWITTER, X } from '../constants/platforms';
+import { ValidationError } from 'errors/ValidationError';
 
 const router = Router();
 
@@ -73,7 +74,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
             switch (platform) {
                 case TUMBLR:
                     if (!platformOptions?.tumblr?.blogName)
-                        throw new Error('blogName é obrigatório para o Tumblr.');
+                        throw new ValidationError('blogName é obrigatório para o Tumblr.');
                     const result = await handleTumblrPost({ text, images: imagesPost, urls: urlsPost, tags, instanceId, postId, ...platformOptions.tumblr });
                     publishTime = result.publishTime;
                     status = result.scheduled ? 'scheduled' : (result.success ? 'success' : 'error');
@@ -91,7 +92,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                     status = await handleThreadsPost({ text: text || '', images: imagesPost, urls: urlsPost, tags, instanceId, postId }) ? 'success' : 'error';
                     break;
                 default:
-                    throw new Error(`Plataforma desconhecida: ${platform}`);
+                    throw new ValidationError(`Plataforma desconhecida: ${platform}`);
             }
             Logger.info(`[Publish All] Sucesso ao postar em: ${platform}`);
 
@@ -101,7 +102,10 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
             errorDetails = error.message || 'Erro desconhecido';
             failedPlatforms.push({ platform, reason: errorDetails || 'Erro desconhecido' });
             Logger.error(`[Publish All] Falha ao postar em ${platform}: %o`, error);
-            Sentry.captureException(error, { extra: { platform } });
+
+            // prettier-ignore
+            if (!(error instanceof ValidationError))
+                Sentry.captureException(error, { extra: { platform } });
         }
 
         if (socketId) {

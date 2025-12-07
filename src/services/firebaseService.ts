@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 import Logger from '../config/logger';
+import { ValidationError } from 'errors/ValidationError';
 
 export const BASE_DOCUMENT = 'post_status';
 
@@ -10,7 +11,7 @@ try {
         const databaseURL = process.env.FIREBASE_DATABASE_URL;
 
         if (!databaseURL)
-            throw new Error('A variável de ambiente FIREBASE_DATABASE_URL não está definida.');
+            throw new ValidationError('A variável de ambiente FIREBASE_DATABASE_URL não está definida.');
 
         admin.initializeApp({ databaseURL: databaseURL });
         Logger.info('[Firebase] Firebase Admin SDK inicializado com sucesso.');

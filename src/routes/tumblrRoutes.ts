@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/node';
 import { protect } from '../middleware/authMiddleware';
 import { parseDataUrl } from '../utils/parsing';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
+import { ValidationError } from 'errors/ValidationError';
 
 const router = Router();
 
@@ -79,10 +80,10 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
     const { blogName, text, images, urls, tags, instanceId, postId } = options;
 
     if (!blogName)
-        throw new Error(`Tumblr: O nome do blog (blogName) é obrigatório para o Tumblr.`);
+        throw new ValidationError(`Tumblr: O nome do blog (blogName) é obrigatório para o Tumblr.`);
 
     if (!text && (!images || images.length === 0) && (!urls || urls.length === 0))
-        throw new Error(`Tumblr: É necessário fornecer texto ou imagens.`);
+        throw new ValidationError(`Tumblr: É necessário fornecer texto ou imagens.`);
 
     const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 

@@ -6,6 +6,7 @@ import { uploadImage } from '../services/cloudinaryService';
 import { ThreadsApiError, ThreadsAuthenticatedApiClient } from '@libs/threads-graph-api/index.js';
 import { toTitleCase } from '../utils/texts';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
+import { ValidationError } from 'errors/ValidationError';
 
 const router = Router();
 
@@ -24,11 +25,11 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
     const hasImages = (images && images.length > 0) || (urls && urls.length > 0);
 
     if (!hasText && !hasImages)
-        throw new Error('Threads: É necessário fornecer texto ou imagens para o Threads.');
+        throw new ValidationError('Threads: É necessário fornecer texto ou imagens para o Threads.');
 
     const { THREADS_ACCESS_TOKEN, THREADS_USER_ID } = process.env;
     if (!THREADS_ACCESS_TOKEN || !THREADS_USER_ID)
-        throw new Error('Threads: Credenciais da Threads Graph API não configuradas no .env');
+        throw new ValidationError('Threads: Credenciais da Threads Graph API não configuradas no .env');
 
     let debugLog = '';
 

@@ -7,6 +7,7 @@ import { parseDataUrl } from '../utils/parsing';
 import { toTitleCase } from '../utils/texts';
 import sharp from 'sharp';
 import { BASE_DOCUMENT, db } from '../services/firebaseService';
+import { ValidationError } from 'errors/ValidationError';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ async function ensureAuthenticatedAgent() {
         const { BLUESKY_HANDLE, BLUESKY_APP_PASSWORD } = process.env;
 
         if (!BLUESKY_HANDLE || !BLUESKY_APP_PASSWORD)
-            throw new Error('As credenciais do Bluesky não estão configuradas no .env');
+            throw new ValidationError('As credenciais do Bluesky não estão configuradas no .env');
 
         await agent.login({
             identifier: BLUESKY_HANDLE,
@@ -44,10 +45,10 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
     const { text, images, tags, instanceId, postId } = options;
 
     if (!text && (!images || images.length === 0))
-        throw new Error('Bluesky: É necessário fornecer texto ou imagens.');
+        throw new ValidationError('Bluesky: É necessário fornecer texto ou imagens.');
 
     if (images && images.length > 4)
-        throw new Error('Bluesky: É permitido no máximo 4 imagens por post no Bluesky.');
+        throw new ValidationError('Bluesky: É permitido no máximo 4 imagens por post no Bluesky.');
 
     const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 
