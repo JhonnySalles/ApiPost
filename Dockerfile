@@ -3,7 +3,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Adiciona dependências para o 'sharp'
-RUN apk add --no-cache vips-dev
+RUN apk add --no-cache vips-dev python3 make g++
 
 COPY package.json yarn.lock ./
 
