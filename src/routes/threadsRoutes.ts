@@ -120,7 +120,24 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
             }
         }
 
-        const { id: postId } = process.env.IGNORAR_POST ? { id: `[Tumblr] Ignorado o envio do post.` } : await client.publish({ creationId });
+        let publishResult;
+
+        if (process.env.IGNORAR_POST)
+            publishResult = { id: `[Tumblr] Ignorado o envio do post.` };
+        else {
+            try {
+                publishResult = await client.publish({ creationId });
+            } catch (publishError: any) {
+                if (publishError instanceof ThreadsApiError && publishError.message === "Invalid parameter") {
+                    Logger.warn(`[Threads] Erro 'Invalid parameter' detectado na publicação. Aguardando 1s para tentar novamente...`);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    publishResult = await client.publish({ creationId });
+                } else
+                    throw publishError;
+            }
+        }
+
+        const { id: postId } = publishResult;
 
         if (dbRef)
             await dbRef.update({ threads: { status: 'success', error: null, } });
