@@ -110,6 +110,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
 
         if (socketId) {
             io.to(socketId).emit('progressUpdate', {
+                postId,
                 type: 'progress',
                 platform,
                 status,
@@ -140,6 +141,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
     if (socketId) {
         Logger.info(`[Publish All] Enviando sumário final para o socket: ${socketId}`);
         io.to(socketId).emit('taskCompleted', {
+            postId,
             type: 'summary',
             status: 'completed',
             summary: {
