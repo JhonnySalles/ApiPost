@@ -111,11 +111,32 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
 
                 Logger.info('[Threads] Criando contêiner principal do carrossel...');
                 debugLog += `\nParâmetros para o contêiner principal do carrossel:\n${JSON.stringify({ mediaType: 'CAROUSEL', text: finalText ? finalText.replace("\t", "") : undefined, children: itemContainerIds, }, null, 2)}\n`;
-                const carouselContainer = await client.createMediaContainer({
-                    mediaType: 'CAROUSEL',
-                    text: finalText ? finalText.replace("\t", "") : undefined,
-                    children: itemContainerIds,
-                });
+
+                let carouselContainer;
+                let attempts = 0;
+                const maxAttempts = 3;
+                while (attempts < maxAttempts) {
+                    try {
+                        carouselContainer = await client.createMediaContainer({
+                            mediaType: 'CAROUSEL',
+                            text: finalText ? finalText.replace("\t", "") : undefined,
+                            children: itemContainerIds,
+                        });
+                        break;
+                    } catch (err: any) {
+                        attempts++;
+                        if (err instanceof ThreadsApiError && err.message === "Invalid parameter" && attempts < maxAttempts) {
+                            debugLog += `\nTentativa ${attempts} falhou com erro 'Invalid parameter'. Aguardando 2 segundos antes de tentar novamente...\n`;
+                            Logger.warn(`[Threads] Imagens filhas ainda em processamento na Meta. Tentativa ${attempts}/${maxAttempts}. Aguardando 2 segundos...`);
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        } else
+                            throw err;
+                    }
+                }
+
+                if (!carouselContainer)
+                    throw new Error('Falha ao criar o contêiner do carrossel após múltiplas tentativas.');
+
                 creationId = carouselContainer.id;
             }
         }
@@ -129,8 +150,8 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
                 publishResult = await client.publish({ creationId });
             } catch (publishError: any) {
                 if (publishError instanceof ThreadsApiError && publishError.message === "Invalid parameter") {
-                    Logger.warn(`[Threads] Erro 'Invalid parameter' detectado na publicação. Aguardando 1s para tentar novamente...`);
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    Logger.warn(`[Threads] Erro 'Invalid parameter' detectado na publicação. Aguardando 2s para tentar novamente...`);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                     publishResult = await client.publish({ creationId });
                 } else
                     throw publishError;
