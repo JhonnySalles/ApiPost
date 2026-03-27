@@ -5,10 +5,6 @@ import * as Sentry from '@sentry/node';
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
-const API_USER = process.env.API_USER;
-const API_PASSWORD = process.env.API_PASSWORD;
-const API_ACCESS_TOKEN = process.env.API_ACCESS_TOKEN;
 const TOKEN_EXPIRATION_IN_SECONDS = 24 * 60 * 60;
 
 /**
@@ -64,6 +60,11 @@ router.post('/login', (req: Request, res: Response) => {
 
         if (!username || !password || !accessToken)
             return res.status(400).json({ message: 'Usuário, senha e accessToken são obrigatórios.' });
+
+        const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
+        const API_USER = process.env.API_USER;
+        const API_PASSWORD = process.env.API_PASSWORD;
+        const API_ACCESS_TOKEN = process.env.API_ACCESS_TOKEN;
 
         const isCredentialsValid = username === API_USER && password === API_PASSWORD;
         const isAccessTokenValid = accessToken === API_ACCESS_TOKEN;
@@ -128,6 +129,9 @@ router.post('/token/refresh', (req: Request, res: Response) => {
         const { accessToken } = req.body;
         const authHeader = req.headers['authorization'];
         const oldToken = authHeader && authHeader.split(' ')[1];
+
+        const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
+        const API_ACCESS_TOKEN = process.env.API_ACCESS_TOKEN;
 
         if (accessToken !== API_ACCESS_TOKEN || !oldToken)
             return res.status(401).json({ message: 'Token de acesso ou token JWT ausente/inválido.' });

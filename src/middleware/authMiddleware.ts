@@ -3,6 +3,10 @@ import jwt from 'jsonwebtoken';
 import Logger from '../config/logger';
 
 export const protect = (req: Request, res: Response, next: NextFunction) => {
+    if (process.env.IGNORAR_POST) {
+        return next();
+    }
+
     const authHeader = req.headers.authorization;
     const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 

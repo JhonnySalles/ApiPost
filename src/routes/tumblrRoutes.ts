@@ -114,8 +114,11 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
             Logger.warn(`[Tumblr] Ignorado o envio do post.`);
             await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
 
-            if (Math.random() < 0.3) {
-                Logger.warn(`[Tumblr] Simulando uma falha (30% de chance).`);
+            if ((process.env.NODE_ENV !== 'test' && Math.random() < 0.3) || process.env.TEST_ERROR) {
+                if (process.env.TEST_ERROR)
+                    Logger.warn(`[Tumblr] Simulando um falha.`);
+                else
+                    Logger.warn(`[Tumblr] Simulando uma falha (30% de chance).`);
                 throw new Error('Teste de excessão');
             }
         }
@@ -229,7 +232,8 @@ router.post('/post', protect, async (req: Request, res: Response) => {
         const status = result.scheduled ? 201 : 200;
         res.status(status).json({ message: 'Post criado com sucesso!', ...result });
     } catch (error: any) {
-        res.status(500).json({ message: error.message || 'Erro ao postar no Tumblr.' });
+        const status = error instanceof ValidationError ? 400 : 500;
+        res.status(status).json({ message: error.message || 'Erro ao postar no Tumblr.' });
     }
 });
 

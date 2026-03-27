@@ -61,9 +61,11 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(port, 0, () => {
-    Logger.info(`👂 Servidor escutando em 0.0.0.0 na porta ${port}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+    server.listen(port, 0, () => {
+        Logger.info(`👂 Servidor escutando em 0.0.0.0 na porta ${port}`);
+    });
+}
 
 //app.use(Sentry.expressRequestHandler());
 
@@ -124,7 +126,11 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
 });
 
-app.listen(port, () => {
-    Logger.info(`🚀 Servidor rodando em http://localhost:${port}`);
-    Logger.info(`📚 Documentação disponível em http://localhost:${port}/api-docs`);
-});
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(port, () => {
+        Logger.info(`🚀 Servidor rodando em http://localhost:${port}`);
+        Logger.info(`📚 Documentação disponível em http://localhost:${port}/api-docs`);
+    });
+}
+
+export { app };

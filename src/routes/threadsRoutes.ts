@@ -62,8 +62,11 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
             Logger.warn(`[Threads] Ignorado o envio do post.`);
             await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
 
-            if (Math.random() < 0.3) {
-                Logger.warn(`[Threads] Simulando uma falha (30% de chance).`);
+            if ((process.env.NODE_ENV !== 'test' && Math.random() < 0.3) || process.env.TEST_ERROR) {
+                if (process.env.TEST_ERROR)
+                    Logger.warn(`[Threads] Simulando um falha.`);
+                else
+                    Logger.warn(`[Threads] Simulando uma falha (30% de chance).`);
                 throw new Error('Teste de excessão');
             }
         } else if (!hasImages) {
@@ -144,7 +147,7 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         let publishResult;
 
         if (process.env.IGNORAR_POST)
-            publishResult = { id: `[Tumblr] Ignorado o envio do post.` };
+            publishResult = { id: `[Threads] Ignorado o envio do post.` };
         else {
             try {
                 publishResult = await client.publish({ creationId });
@@ -265,7 +268,8 @@ router.post('/post', protect, async (req: Request, res: Response) => {
         const result = await handleThreadsPost(req.body);
         res.status(200).json({ message: 'Post criado com sucesso!', ...result });
     } catch (error: any) {
-        res.status(500).json({ message: error.message || 'Erro ao postar no Threads.' });
+        const status = error instanceof ValidationError ? 400 : 500;
+        res.status(status).json({ message: error.message || 'Erro ao postar no Threads.' });
     }
 });
 

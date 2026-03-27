@@ -54,8 +54,11 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
             Logger.warn(`[Twitter] Ignorado o envio do post.`);
             await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
 
-            if (Math.random() < 0.3) {
-                Logger.warn(`[Twitter] Simulando uma falha (30% de chance).`);
+            if ((process.env.NODE_ENV !== 'test' && Math.random() < 0.3) || process.env.TEST_ERROR) {
+                if (process.env.TEST_ERROR)
+                    Logger.warn(`[Twitter] Simulando um falha.`);
+                else
+                    Logger.warn(`[Twitter] Simulando uma falha (30% de chance).`);
                 throw new Error('Teste de excessão');
             }
         } else if (images && images.length > 0) {
@@ -152,7 +155,8 @@ router.post('/post', protect, async (req: Request, res: Response) => {
         const result = await handleTwitterPost(req.body);
         res.status(200).json({ message: 'Tweet criado com sucesso!', ...result });
     } catch (error: any) {
-        res.status(500).json({ message: error.message || 'Erro ao postar no Twitter.' });
+        const status = error instanceof ValidationError ? 400 : 500;
+        res.status(status).json({ message: error.message || 'Erro ao postar no Twitter.' });
     }
 });
 
