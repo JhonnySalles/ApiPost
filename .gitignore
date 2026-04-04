@@ -141,3 +141,4 @@ deploy.bat
 deployForPatch.bat
 secrets.json
 firebase-service-account.json
+/.agent
