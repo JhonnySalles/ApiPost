@@ -111,10 +111,14 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
 
     try {
         if (process.env.IGNORAR_POST) {
-            Logger.warn(`[Tumblr] Ignorado o envio do post.`);
+            if (process.env.NODE_ENV !== 'test')
+                Logger.warn(`[Tumblr] Ignorado o envio do post.`);
+
             await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
 
-            if ((process.env.NODE_ENV !== 'test' && Math.random() < 0.3) || process.env.TEST_ERROR) {
+            if (process.env.NODE_ENV == 'test' && process.env.TEST_ERROR)
+                throw new Error('Teste de excessão');
+            else if (process.env.NODE_ENV !== 'test' && Math.random() < 0.3) {
                 if (process.env.TEST_ERROR)
                     Logger.warn(`[Tumblr] Simulando um falha.`);
                 else
@@ -163,7 +167,8 @@ export async function handleTumblrPost(options: TumblrPostOptions) {
                 throw draftError;
             }
         } else {
-            Logger.error(`[Tumblr] Erro ao postar no Tumblr no blog ${blogName}: %o`, error);
+            if (process.env.NODE_ENV !== 'test')
+                Logger.error(`[Tumblr] Erro ao postar no Tumblr no blog ${blogName}: %o`, error);
             Sentry.captureException(error, { extra: { blogName } });
 
             if (dbRef)

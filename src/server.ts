@@ -20,27 +20,32 @@ import blueskyRoutes from './routes/blueskyRoutes';
 import threadsRoutes from './routes/threadsRoutes';
 import publishAllRoutes from './routes/publishAllRoutes';
 
-if (process.env.IGNORAR_POST)
+if (process.env.NODE_ENV === 'test')
+    process.env.IGNORAR_POST = 'true';
+
+if (process.env.IGNORAR_POST && process.env.NODE_ENV !== 'test')
     Logger.warn(`🧪 Servidor configurado para teste, será ignorado os envios de posts.`);
 
-Sentry.init({
-    dsn: process.env.SENTRY_DSN,
-    integrations: [
-        Sentry.httpIntegration(),
-        Sentry.expressIntegration(),
-        nodeProfilingIntegration(),
-    ],
-    tracesSampleRate: 1.0,
-    profilesSampleRate: 1.0,
+if (process.env.NODE_ENV !== 'test') {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        integrations: [
+            Sentry.httpIntegration(),
+            Sentry.expressIntegration(),
+            nodeProfilingIntegration(),
+        ],
+        tracesSampleRate: 1.0,
+        profilesSampleRate: 1.0,
 
-    beforeSend(event, hint) {
-        if (event.level === 'warning' || event.level === 'error' || event.level === 'fatal') {
-            Logger.warn(`Evento Sentry sendo enviado: ${event.event_id}`);
-            return event;
-        }
-        return null;
-    },
-});
+        beforeSend(event, hint) {
+            if (event.level === 'warning' || event.level === 'error' || event.level === 'fatal') {
+                Logger.warn(`Evento Sentry sendo enviado: ${event.event_id}`);
+                return event;
+            }
+            return null;
+        },
+    });
+}
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -120,7 +125,9 @@ app.use('/x', twitterRoutes);
 app.use('/bluesky', blueskyRoutes);
 app.use('/threads', threadsRoutes);
 
-app.use(Sentry.expressErrorHandler());
+if (process.env.NODE_ENV !== 'test') {
+    app.use(Sentry.expressErrorHandler());
+}
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     Logger.error('Erro não tratado capturado pelo handler final: %o', err.message || err);
     res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });

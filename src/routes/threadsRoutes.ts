@@ -59,10 +59,14 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
         let creationId: string;
         if (process.env.IGNORAR_POST) {
             creationId = '1';
-            Logger.warn(`[Threads] Ignorado o envio do post.`);
+            if (process.env.NODE_ENV !== 'test')
+                Logger.warn(`[Threads] Ignorado o envio do post.`);
+
             await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
 
-            if ((process.env.NODE_ENV !== 'test' && Math.random() < 0.3) || process.env.TEST_ERROR) {
+            if (process.env.NODE_ENV == 'test' && process.env.TEST_ERROR)
+                throw new Error('Teste de excessão');
+            else if (process.env.NODE_ENV !== 'test' && Math.random() < 0.3) {
                 if (process.env.TEST_ERROR)
                     Logger.warn(`[Threads] Simulando um falha.`);
                 else
@@ -204,9 +208,11 @@ export async function handleThreadsPost(options: ThreadsPostOptions) {
 
             throw new Error(`Erro da API do Threads: ${apiError?.error?.message || error.message}`);
         }
-        Logger.error('[Threads] Erro ao postar no Threads: %o -- Debug: %o', error, {
-            threadsDebugLog: debugLog
-        });
+
+        if (process.env.NODE_ENV !== 'test')
+            Logger.error('[Threads] Erro ao postar no Threads: %o -- Debug: %o', error, {
+                threadsDebugLog: debugLog
+            });
 
         if (dbRef)
             await dbRef.update({ threads: { status: 'error', error: (error && error instanceof Error ? error.message : 'Erro ao postar no Threads.') } });

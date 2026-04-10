@@ -53,6 +53,24 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
     const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 
     try {
+        if (process.env.IGNORAR_POST) {
+            if (process.env.NODE_ENV !== 'test')
+                Logger.warn(`[Bluesky] Ignorado o envio do post.`);
+
+            await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
+
+            if (process.env.NODE_ENV == 'test' && process.env.TEST_ERROR)
+                throw new Error('Teste de excessão');
+            else if (process.env.NODE_ENV !== 'test' && Math.random() < 0.3) {
+                if (process.env.TEST_ERROR)
+                    Logger.warn(`[Bluesky] Simulando um falha.`);
+                else
+                    Logger.warn(`[Bluesky] Simulando uma falha (30% de chance).`);
+                throw new Error('Teste de excessão');
+            }
+            return { success: true, data: { message: '[Bluesky] Ignorado o envio do post.', id: 1 } };
+        }
+
         await ensureAuthenticatedAgent();
 
         let finalText = text || '';
@@ -62,19 +80,7 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
         }
 
         const postEmbeds = [];
-
-        if (process.env.IGNORAR_POST) {
-            Logger.warn(`[Bluesky] Ignorado o envio do post.`);
-            await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
-
-            if ((process.env.NODE_ENV !== 'test' && Math.random() < 0.3) || process.env.TEST_ERROR) {
-                if (process.env.TEST_ERROR)
-                    Logger.warn(`[Bluesky] Simulando um falha.`);
-                else
-                    Logger.warn(`[Bluesky] Simulando uma falha (30% de chance).`);
-                throw new Error('Teste de excessão');
-            }
-        } else if (images && images.length > 0) {
+        if (images && images.length > 0) {
             Logger.info('[Bluesky] Fazendo upload de imagens para o Bluesky, com otimização...');
             for (const imageDataUrl of images) {
                 const parsedImage = parseDataUrl(imageDataUrl);
@@ -130,7 +136,8 @@ export async function handleBlueskyPost(options: BlueskyPostOptions) {
         Logger.info(`[Bluesky] Post criado com sucesso! ID: ${postResult.cid}`);
         return { success: true, data: postResult };
     } catch (error) {
-        Logger.error('[Bluesky] Erro ao postar no Bluesky: %o', error);
+        if (process.env.NODE_ENV !== 'test')
+            Logger.error('[Bluesky] Erro ao postar no Bluesky: %o', error);
         Sentry.captureException(error);
 
         if (dbRef)

@@ -44,17 +44,20 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
 
     const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 
-    Logger.info(`[Publish All] Iniciando postagem em ${totalPlatforms} plataformas (${platforms}).`);
+    if (process.env.NODE_ENV !== 'test')
+        Logger.info(`[Publish All] Iniciando postagem em ${totalPlatforms} plataformas (${platforms}).`);
 
     let imagesUrls: string[] | undefined = undefined;
 
     if (images && images.length > 0 && (platforms.includes(TUMBLR) || platforms.includes(THREADS))) {
         try {
-            Logger.info(`[Publish All] Fazendo upload de ${images.length} imagem(ns) para o Cloudinary...`);
+            if (process.env.NODE_ENV !== 'test')
+                Logger.info(`[Publish All] Fazendo upload de ${images.length} imagem(ns) para o Cloudinary...`);
             const allImagesBase64 = images.map(img => img.base64);
             imagesUrls = await Promise.all(allImagesBase64.map(base64 => uploadImage(base64)));
         } catch (error: any) {
-            Logger.error(`[Publish All] Falha crítica no upload para o Cloudinary: ${error.message}`);
+            if (process.env.NODE_ENV !== 'test')
+                Logger.error(`[Publish All] Falha crítica no upload para o Cloudinary: ${error.message}`);
             Sentry.captureException(error);
         }
     }
@@ -70,7 +73,9 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
         const urlsPost = (imagesUrls && (platform === TUMBLR || platform === THREADS)) ? images?.map((image, index) => ({ ...image, url: imagesUrls[index] })).filter(image => !image.platforms || image.platforms.length === 0 || image.platforms.includes(platform)).map(image => image.url) : undefined;
 
         try {
-            Logger.info(`[Publish All] Processando plataforma: ${platform} (${i + 1}/${totalPlatforms})`);
+            if (process.env.NODE_ENV !== 'test')
+                Logger.info(`[Publish All] Processando plataforma: ${platform} (${i + 1}/${totalPlatforms})`);
+
             switch (platform) {
                 case TUMBLR:
                     if (!platformOptions?.tumblr?.blogName)
@@ -94,14 +99,17 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                 default:
                     throw new ValidationError(`Plataforma desconhecida: ${platform}`);
             }
-            Logger.info(`[Publish All] Sucesso ao postar em: ${platform}`);
+
+            if (process.env.NODE_ENV !== 'test')
+                Logger.info(`[Publish All] Sucesso ao postar em: ${platform}`);
 
             successfulPlatforms.push(platform);
         } catch (error: any) {
             status = 'error';
             errorDetails = error.message || 'Erro desconhecido';
             failedPlatforms.push({ platform, reason: errorDetails || 'Erro desconhecido' });
-            Logger.error(`[Publish All] Falha ao postar em ${platform}: %o`, error);
+            if (process.env.NODE_ENV !== 'test')
+                Logger.error(`[Publish All] Falha ao postar em ${platform}: %o`, error);
 
             // prettier-ignore
             if (!(error instanceof ValidationError))
@@ -122,7 +130,8 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
     }
 
     if (dbRef) {
-        Logger.info(`[Publish All] Gravando sumário final no Firebase para o job: ${postId}`);
+        if (process.env.NODE_ENV !== 'test')
+            Logger.info(`[Publish All] Gravando sumário final no Firebase para o job: ${postId}`);
         try {
             await dbRef.update({
                 _summary: {
@@ -133,13 +142,15 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                 }
             });
         } catch (dbError) {
-            Logger.error(`[Publish All] Falha ao gravar sumário no Firebase para o job ${postId}:`, dbError);
+            if (process.env.NODE_ENV !== 'test')
+                Logger.error(`[Publish All] Falha ao gravar sumário no Firebase para o job ${postId}:`, dbError);
             Sentry.captureException(dbError);
         }
     }
 
     if (socketId) {
-        Logger.info(`[Publish All] Enviando sumário final para o socket: ${socketId}`);
+        if (process.env.NODE_ENV !== 'test')
+            Logger.info(`[Publish All] Enviando sumário final para o socket: ${socketId}`);
         io.to(socketId).emit('taskCompleted', {
             postId,
             type: 'summary',
@@ -151,7 +162,8 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
         });
     }
 
-    Logger.info(`[Publish All] Processamento concluído.`);
+    if (process.env.NODE_ENV !== 'test')
+        Logger.info(`[Publish All] Processamento concluído.`);
 }
 
 /**

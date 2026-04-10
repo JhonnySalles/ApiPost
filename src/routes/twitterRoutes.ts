@@ -51,10 +51,14 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
         const mediaIds: string[] = [];
 
         if (process.env.IGNORAR_POST) {
-            Logger.warn(`[Twitter] Ignorado o envio do post.`);
+            if (process.env.NODE_ENV !== 'test')
+                Logger.warn(`[Twitter] Ignorado o envio do post.`);
+
             await new Promise(resolve => setTimeout(resolve, (Math.floor(Math.random() * 5) + 1) * 1000));
 
-            if ((process.env.NODE_ENV !== 'test' && Math.random() < 0.3) || process.env.TEST_ERROR) {
+            if (process.env.NODE_ENV == 'test' && process.env.TEST_ERROR)
+                throw new Error('Teste de excessão');
+            else if (process.env.NODE_ENV !== 'test' && Math.random() < 0.3) {
                 if (process.env.TEST_ERROR)
                     Logger.warn(`[Twitter] Simulando um falha.`);
                 else
@@ -95,7 +99,8 @@ export async function handleTwitterPost(options: TwitterPostOptions) {
         Logger.info(`[Twitter] Tweet criado com sucesso! ID: ${tweetResult.data.id}`);
         return { success: true, data: tweetResult.data };
     } catch (error) {
-        Logger.error('[Twitter] Erro ao postar no Twitter: %o', error);
+        if (process.env.NODE_ENV !== 'test')
+            Logger.error('[Twitter] Erro ao postar no Twitter: %o', error);
         Sentry.captureException(error);
 
         if (dbRef)

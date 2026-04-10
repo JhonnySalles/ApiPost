@@ -39,7 +39,8 @@ export function loadSecrets() {
             Logger.error('ERRO: Falha ao fazer o parse do JSON de segredos:  %o', error);
         }
     } else {
-        Logger.warn('🖥️  Ambiente local detectado. Carregando segredos do arquivo .env.');
+        if (process.env.NODE_ENV !== 'test' || process.env.TEST_ENV)
+            Logger.warn('🖥️  Ambiente local detectado. Carregando segredos do arquivo .env.');
         dotenv.config();
     }
 }
