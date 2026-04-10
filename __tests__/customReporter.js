@@ -6,8 +6,22 @@ class CustomReporter {
   }
 
   onTestStart(test) {
-    const path = test.path ? test.path.split(/[\\/]/).pop() : 'unknown';
-    console.log(`\n\x1b[33m--- INICIANDO SCRIPT: ${path} ---\x1b[0m`);
+    const filename = test.path ? test.path.split(/[\\/]/).pop() : 'unknown';
+    console.log(`\n\x1b[33m--- INICIANDO SCRIPT: ${filename} ---\x1b[0m`);
+  }
+
+  onTestCaseStart(test, testCase) {
+    console.log(`\x1b[34m[RUNNING] ${testCase.title}\x1b[0m`);
+  }
+
+  onTestCaseResult(test, testCaseResult) {
+    if (testCaseResult.status === 'passed') {
+      console.log(`\x1b[32m[SUCCESS] ${testCaseResult.title}\x1b[0m`);
+    } else if (testCaseResult.status === 'failed') {
+      console.log(`\x1b[31m[FAILED]  ${testCaseResult.title}\x1b[0m`);
+    } else if (testCaseResult.status === 'skipped') {
+      console.log(`\x1b[33m[SKIPPED] ${testCaseResult.title}\x1b[0m`);
+    }
   }
 
   onTestResult(test, testResult, aggregatedResult) {

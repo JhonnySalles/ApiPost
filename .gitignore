@@ -142,3 +142,4 @@ deployForPatch.bat
 secrets.json
 firebase-service-account.json
 /.agent
+log-test.txt

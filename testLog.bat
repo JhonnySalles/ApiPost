@@ -3,8 +3,8 @@ setlocal
 
 echo.
 echo ===================================================
-echo 		  Iniciando a rotina de teste!
+echo 		 Iniciando a rotina de teste!
 echo ===================================================
 echo.
 
-yarn test
+yarn test > log-test.txt 2>&1
