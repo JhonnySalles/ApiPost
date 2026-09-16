@@ -344,27 +344,23 @@ paths:
           description: Processamento aceito e iniciado em segundo plano.
   /threads/post:
     post:
-      summary: Cria um novo post no Threads.
+      summary: Cria/enfileira um novo post no Threads.
       tags:
         - Threads
       description: >
-        Publica um novo post no Threads. A função se adapta ao conteúdo
-        fornecido:
+        Enfileira um novo post no Threads para envio assíncrono em segundo
+        plano.
 
-        1.  **Apenas Texto:** Cria um post de texto simples.
-
-        2.  **Texto e 1 Imagem:** Cria um post de imagem única com legenda.
-
-        3.  **Texto e 2+ Imagens:** Cria um post em carrossel.
+        A fila gerencia a criação de contêineres, verificação de processamento e retries com backoff exponencial.
 
 
         **Corpo da Requisição:**
 
         * **`text`** (string, opcional): O conteúdo do post, que servirá como legenda para posts com imagem/carrossel.
 
-        * **`images`** (array, opcional): Uma lista de imagens no formato Data URL (base64). As imagens são primeiro enviadas para um serviço de hospedagem (Cloudinary) para gerar URLs públicas.
+        * **`images`** (array, opcional): Uma lista de imagens no formato Data URL (base64).
 
-        * **`tags`** (array, opcional): Apenas a **primeira tag** da lista será usada como `topic_tag` ou adicionada como hashtag, de acordo com as regras da API do Threads para cada tipo de post.
+        * **`tags`** (array, opcional): Apenas a primeira tag será usada como topic_tag.
 
         * **`instanceId`** (string, opcional): ID da instância do app cliente para rastreamento no Firebase.
 
@@ -373,9 +369,9 @@ paths:
 
         **Corpo da Resposta:**
 
-        * Retorna um objeto com o ID do post criado com sucesso (status `201 Created`).
+        * Retorna status `202 Accepted` com `jobId` e `status: 'queued'`.
 
-        * Retorna um erro `400 Bad Request` se os dados forem insuficientes (sem texto ou imagem).
+        * O status do processamento pode ser consultado via `GET /threads/status/{jobId}`.
       security:
         - bearerAuth: []
       requestBody:
@@ -411,8 +407,33 @@ paths:
               instanceId: asdffasdfFMaxwBvUw49LOjc2
               postId: "153"
       responses:
+        "202":
+          description: Post enfileirado com sucesso para processamento em background.
+  "/threads/status/{jobId}":
+    get:
+      summary: Consulta o status de processamento de um post no Threads.
+      tags:
+        - Threads
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+          description: ID do job retornado no endpoint /threads/post.
+      responses:
         "200":
-          description: Post criado com sucesso.
+          description: Status atual do job.
+        "404":
+          description: Job não encontrado ou expirado.
+  /threads/queue/status:
+    get:
+      summary: Consulta o status da fila de envio do Threads.
+      tags:
+        - Threads
+      responses:
+        "200":
+          description: Informações gerais da fila.
   /tumblr/blogs:
     get:
       summary: Retorna a lista de blogs do usuário no Tumblr.

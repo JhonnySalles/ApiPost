@@ -94,7 +94,8 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                     status = await handleBlueskyPost({ text: text || '', images: listBluesky, tags, instanceId, postId }) ? 'success' : 'error';
                     break;
                 case THREADS:
-                    status = await handleThreadsPost({ text: text || '', images: imagesPost, urls: urlsPost, tags, instanceId, postId }) ? 'success' : 'error';
+                    const threadsResult = await handleThreadsPost({ text: text || '', images: imagesPost, urls: urlsPost, tags, instanceId, postId });
+                    status = threadsResult.scheduled ? 'scheduled' : (threadsResult.success ? 'success' : 'error');
                     break;
                 default:
                     throw new ValidationError(`Plataforma desconhecida: ${platform}`);
