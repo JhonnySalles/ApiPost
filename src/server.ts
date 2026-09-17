@@ -12,6 +12,7 @@ import path from 'path';
 import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import Logger from './config/logger';
+import { loadRemoteSecrets } from './config/remoteConfig';
 import './services/firebaseService';
 import authRoutes from './routes/authRoutes';
 import tumblrRoutes from './routes/tumblrRoutes';
@@ -137,6 +138,10 @@ if (process.env.NODE_ENV !== 'test') {
     app.listen(port, () => {
         Logger.info(`🚀 Servidor rodando em http://localhost:${port}`);
         Logger.info(`📚 Documentação disponível em http://localhost:${port}/api-docs`);
+        
+        loadRemoteSecrets().catch((err) => {
+            Logger.error('[Server] Falha ao executar loadRemoteSecrets em background: %o', err);
+        });
     });
 }
 
