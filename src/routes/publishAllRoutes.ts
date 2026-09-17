@@ -42,10 +42,29 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
     const successfulPlatforms: string[] = [];
     const failedPlatforms: { platform: string; reason: string }[] = [];
 
-    const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
+    const dbRef = (instanceId && postId && db) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 
     if (process.env.NODE_ENV !== 'test')
         Logger.info(`[Publish All] Iniciando postagem em ${totalPlatforms} plataformas (${platforms}).`);
+
+    if (dbRef) {
+        try {
+            const initialData: Record<string, any> = {
+                _summary: {
+                    status: 'in_progress',
+                    startedAt: new Date().toISOString(),
+                    total: totalPlatforms,
+                    platforms,
+                }
+            };
+            platforms.forEach(p => {
+                initialData[p] = { status: 'pending', error: null };
+            });
+            await dbRef.update(initialData);
+        } catch (initErr) {
+            Logger.warn('[Publish All] Falha ao inicializar post_status no Firebase:', initErr);
+        }
+    }
 
     let imagesUrls: string[] | undefined = undefined;
 
@@ -134,13 +153,16 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
         if (process.env.NODE_ENV !== 'test')
             Logger.info(`[Publish All] Gravando sumário final no Firebase para o job: ${postId}`);
         try {
-            await dbRef.update({
-                _summary: {
-                    status: 'completed',
-                    completedAt: new Date().toISOString(),
-                    successful: successfulPlatforms,
-                    failed: failedPlatforms,
-                }
+            const hasPendingThreads = platforms.includes(THREADS);
+            const summaryStatus = hasPendingThreads
+                ? 'processing'
+                : (failedPlatforms.length === 0 ? 'completed' : (successfulPlatforms.length === 0 ? 'failed' : 'completed_with_errors'));
+
+            await dbRef.child('_summary').update({
+                status: summaryStatus,
+                completedAt: hasPendingThreads ? null : new Date().toISOString(),
+                successful: successfulPlatforms,
+                failed: failedPlatforms,
             });
         } catch (dbError) {
             if (process.env.NODE_ENV !== 'test')

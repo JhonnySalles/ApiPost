@@ -46,7 +46,7 @@ class ThreadsQueueManager {
     }
 
     public enqueue(options: ThreadsPostOptions): ThreadsJob {
-        const { text, images, urls } = options;
+        const { text, images, urls, instanceId, postId } = options;
         const hasText = text && text.trim().length > 0;
         const hasImages = (images && images.length > 0) || (urls && urls.length > 0);
 
@@ -66,6 +66,18 @@ class ThreadsQueueManager {
 
         this.jobsMap.set(job.id, job);
         this.queue.push(job);
+
+        // Registra status inicial queued com o jobId no Firebase se instanceId e postId forem informados
+        if (instanceId && postId && db) {
+            db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}/threads`).update({
+                status: 'queued',
+                jobId: job.id,
+                error: null,
+                updatedAt: new Date().toISOString(),
+            }).catch(dbErr => {
+                Logger.error('[ThreadsQueue] Falha ao registrar status queued no Firebase:', dbErr);
+            });
+        }
 
         Logger.info(`[ThreadsQueue] Job ${job.id} enfileirado com sucesso. Posição na fila: ${this.queue.length}`);
 
@@ -116,6 +128,17 @@ class ThreadsQueueManager {
         job.updatedAt = new Date();
         Logger.info(`[ThreadsQueue] Iniciando processamento do Job ${job.id}...`);
 
+        const { instanceId, postId } = job.options;
+        if (instanceId && postId && db) {
+            db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}/threads`).update({
+                status: 'processing',
+                jobId: job.id,
+                updatedAt: new Date().toISOString(),
+            }).catch(dbErr => {
+                Logger.warn('[ThreadsQueue] Falha ao atualizar status para processing no Firebase:', dbErr);
+            });
+        }
+
         try {
             const result = await this.executeJobWithRetry(job);
             job.status = 'completed';
@@ -136,7 +159,7 @@ class ThreadsQueueManager {
 
     private async executeJobWithRetry(job: ThreadsJob): Promise<{ postId: string }> {
         const { instanceId, postId } = job.options;
-        const dbRef = (instanceId && postId) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
+        const dbRef = (instanceId && postId && db) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
 
         return withRetry(
             async () => {
@@ -162,33 +185,96 @@ class ThreadsQueueManager {
             }
         ).then(async (result) => {
             if (dbRef) {
-                await dbRef.update({ threads: { status: 'success', error: null, postId: result.postId } });
+                await dbRef.child('threads').update({
+                    status: 'success',
+                    jobId: job.id,
+                    error: null,
+                    postId: result.postId,
+                    updatedAt: new Date().toISOString(),
+                });
+
+                // Atualiza o _summary para refletir o sucesso do Threads
+                try {
+                    const summaryRef = dbRef.child('_summary');
+                    const snap = await summaryRef.once('value');
+                    if (snap.exists()) {
+                        const summary = snap.val() || {};
+                        const successful: string[] = Array.isArray(summary.successful) ? summary.successful : [];
+                        const failed: any[] = Array.isArray(summary.failed) ? summary.failed : [];
+
+                        if (!successful.includes('threads')) {
+                            successful.push('threads');
+                        }
+                        const updatedFailed = failed.filter(item => typeof item === 'object' ? item.platform !== 'threads' : item !== 'threads');
+
+                        await summaryRef.update({
+                            successful,
+                            failed: updatedFailed,
+                            status: updatedFailed.length === 0 ? 'completed' : 'completed_with_errors',
+                            completedAt: new Date().toISOString(),
+                        });
+                    }
+                } catch (summaryErr) {
+                    Logger.error('[ThreadsQueue] Erro ao sincronizar _summary no Firebase após sucesso:', summaryErr);
+                }
             }
             return result;
         }).catch(async (finalError) => {
             const errorMsg = finalError instanceof Error ? finalError.message : String(finalError);
 
             if (dbRef) {
-                await dbRef.update({
-                    threads: {
-                        status: 'error',
-                        error: errorMsg || 'Erro ao postar no Threads.',
-                    },
+                await dbRef.child('threads').update({
+                    status: 'error',
+                    jobId: job.id,
+                    error: errorMsg || 'Erro ao postar no Threads.',
+                    updatedAt: new Date().toISOString(),
                 });
+
+                // Atualiza o _summary para remover Threads dos sucessos e colocar nas falhas
+                try {
+                    const summaryRef = dbRef.child('_summary');
+                    const snap = await summaryRef.once('value');
+                    if (snap.exists()) {
+                        const summary = snap.val() || {};
+                        const successful: string[] = Array.isArray(summary.successful) ? summary.successful : [];
+                        const failed: any[] = Array.isArray(summary.failed) ? summary.failed : [];
+
+                        const updatedSuccessful = successful.filter(p => p !== 'threads');
+                        const existingFailedIndex = failed.findIndex(item => typeof item === 'object' && item.platform === 'threads');
+                        const failedEntry = { platform: 'threads', reason: errorMsg || 'Erro ao postar no Threads.' };
+
+                        if (existingFailedIndex >= 0) {
+                            failed[existingFailedIndex] = failedEntry;
+                        } else {
+                            failed.push(failedEntry);
+                        }
+
+                        await summaryRef.update({
+                            successful: updatedSuccessful,
+                            failed,
+                            status: updatedSuccessful.length === 0 ? 'failed' : 'completed_with_errors',
+                            completedAt: new Date().toISOString(),
+                        });
+                    }
+                } catch (summaryErr) {
+                    Logger.error('[ThreadsQueue] Erro ao sincronizar _summary no Firebase após erro:', summaryErr);
+                }
             }
 
             // Registrar erro no Firebase post_errors e Sentry
             try {
-                const errorLogRef = db.ref('post_errors');
-                await errorLogRef.push({
-                    timestamp: new Date().toISOString(),
-                    platform: 'threads',
-                    errorMessage: errorMsg,
-                    fullError: JSON.parse(JSON.stringify(finalError, Object.getOwnPropertyNames(finalError))),
-                    postId: postId || null,
-                    jobId: job.id,
-                    attempts: job.attempts,
-                });
+                if (db) {
+                    const errorLogRef = db.ref('post_errors');
+                    await errorLogRef.push({
+                        timestamp: new Date().toISOString(),
+                        platform: 'threads',
+                        errorMessage: errorMsg,
+                        fullError: JSON.parse(JSON.stringify(finalError, Object.getOwnPropertyNames(finalError))),
+                        postId: postId || null,
+                        jobId: job.id,
+                        attempts: job.attempts,
+                    });
+                }
             } catch (dbError) {
                 Logger.error('[Firebase] Falha ao gravar log de erro no Firebase:', dbError);
                 Sentry.captureException(dbError);
@@ -206,9 +292,9 @@ class ThreadsQueueManager {
         });
     }
 
-    private async pollContainerUntilReady(client: ThreadsAuthenticatedApiClient, containerId: string, maxPollSeconds = 30): Promise<void> {
+    private async pollContainerUntilReady(client: ThreadsAuthenticatedApiClient, containerId: string, maxPollSeconds = 45): Promise<void> {
         const startTime = Date.now();
-        const pollIntervalMs = 1500;
+        const pollIntervalMs = 2500;
 
         while (Date.now() - startTime < maxPollSeconds * 1000) {
             try {
@@ -218,9 +304,10 @@ class ThreadsQueueManager {
                 });
 
                 const containerStatus = mediaObj.status || mediaObj.status_code;
-                Logger.info(`[ThreadsQueue] Status do contêiner ${containerId}: ${containerStatus}`);
+                Logger.info(`[ThreadsQueue] Polling contêiner ${containerId}: status = ${containerStatus}`);
 
                 if (containerStatus === 'FINISHED' || containerStatus === 'PUBLISHED') {
+                    Logger.info(`[ThreadsQueue] ✅ Contêiner ${containerId} está pronto (${containerStatus}).`);
                     return;
                 }
 
@@ -234,15 +321,18 @@ class ThreadsQueueManager {
                     if (!classified.isRetryable) {
                         throw err;
                     }
+                    Logger.warn(`[ThreadsQueue] Aviso transitório ao consultar contêiner ${containerId}: ${err.message}. Retentando polling...`);
                 } else if (err.message && err.message.includes('falhou com status')) {
                     throw err;
+                } else {
+                    Logger.warn(`[ThreadsQueue] Erro ao consultar status do contêiner ${containerId}: ${err?.message || err}. Retentando...`);
                 }
             }
 
             await sleep(pollIntervalMs);
         }
 
-        Logger.warn(`[ThreadsQueue] Timeout de ${maxPollSeconds}s ao aguardar contêiner ${containerId}. Tentando prosseguir...`);
+        Logger.warn(`[ThreadsQueue] Timeout de ${maxPollSeconds}s atingido ao aguardar contêiner ${containerId}. Prosseguindo...`);
     }
 
     private async publishPost(job: ThreadsJob): Promise<{ postId: string }> {
@@ -316,12 +406,14 @@ class ThreadsQueueManager {
                 creationId = response.id;
 
                 // Aguarda o contêiner de imagem ficar pronto
-                await this.pollContainerUntilReady(client, creationId, 20);
+                await this.pollContainerUntilReady(client, creationId, 45);
             } else {
                 Logger.info('[ThreadsQueue] Criando contêineres de itens para o carrossel sequencialmente...');
                 const itemContainerIds: string[] = [];
 
-                for (const url of imageUrls) {
+                for (let i = 0; i < imageUrls.length; i++) {
+                    const url = imageUrls[i];
+                    Logger.info(`[ThreadsQueue] Criando contêiner para item ${i + 1}/${imageUrls.length} do carrossel...`);
                     const itemRes = await client.createMediaContainer({
                         mediaType: 'IMAGE',
                         imageUrl: url,
@@ -329,8 +421,11 @@ class ThreadsQueueManager {
                     });
                     itemContainerIds.push(itemRes.id);
                     // Garante processamento de cada imagem filha
-                    await this.pollContainerUntilReady(client, itemRes.id, 15);
+                    await this.pollContainerUntilReady(client, itemRes.id, 40);
                 }
+
+                // Pausa de 2 segundos para garantir sincronização na infraestrutura da Meta
+                await sleep(2000);
 
                 let finalText = text || '';
                 if (topicTag && topicTag.length > 0) {
@@ -347,7 +442,7 @@ class ThreadsQueueManager {
 
                 creationId = carouselContainer.id;
                 // Aguarda o carrossel principal ficar pronto
-                await this.pollContainerUntilReady(client, creationId, 25);
+                await this.pollContainerUntilReady(client, creationId, 45);
             }
         }
 

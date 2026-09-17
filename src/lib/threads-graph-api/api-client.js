@@ -190,11 +190,13 @@ var ThreadsApiError = /** @class */ (function (_super) {
   __extends(ThreadsApiError, _super);
   function ThreadsApiError(error) {
     var _newTarget = this.constructor;
-    var _this =
-      _super.call(
-        this,
-        (error === null || error === void 0 ? void 0 : error.error.message) || 'An unknown error occurred'
-      ) || this;
+    var msg =
+      (error && error.error && (error.error.message || error.error.error_user_msg)) ||
+      (error && error.message) ||
+      (typeof error === 'string' ? error : 'An unknown error occurred');
+    var code = error && error.error && error.error.code;
+    var formattedMsg = code ? '[Threads API Code ' + code + '] ' + msg : msg;
+    var _this = _super.call(this, formattedMsg) || this;
     _this._error = error;
     var actualProto = _newTarget.prototype;
     if (Object.setPrototypeOf) {
@@ -223,7 +225,7 @@ var ThreadsPublicApiClient = /** @class */ (function () {
   };
   ThreadsPublicApiClient.prototype._apiGet = function (endpoint, params, responseSchema) {
     return __awaiter(this, void 0, void 0, function () {
-      var filteredParams, apiUrl, response, json, error;
+      var filteredParams, apiUrl, response, json;
       return __generator(this, function (_a) {
         switch (_a.label) {
           case 0:
@@ -245,9 +247,8 @@ var ThreadsPublicApiClient = /** @class */ (function () {
             return [4 /*yield*/, response.json()];
           case 2:
             json = _a.sent();
-            if (json.error) {
-              error = ErrorResponseSchema.safeParse(json);
-              throw new ThreadsApiError(error.success ? error.data : undefined);
+            if (json.error || !response.ok) {
+              throw new ThreadsApiError(json);
             }
             return [2 /*return*/, responseSchema.parse(json)];
         }
@@ -256,7 +257,7 @@ var ThreadsPublicApiClient = /** @class */ (function () {
   };
   ThreadsPublicApiClient.prototype._apiPost = function (endpoint, params, responseSchema) {
     return __awaiter(this, void 0, void 0, function () {
-      var apiUrl, body, response, json, error;
+      var apiUrl, body, response, json;
       return __generator(this, function (_a) {
         switch (_a.label) {
           case 0:
@@ -277,9 +278,8 @@ var ThreadsPublicApiClient = /** @class */ (function () {
             return [4 /*yield*/, response.json()];
           case 2:
             json = _a.sent();
-            if (json.error) {
-              error = ErrorResponseSchema.safeParse(json);
-              throw new ThreadsApiError(error.success ? error.data : undefined);
+            if (json.error || !response.ok) {
+              throw new ThreadsApiError(json);
             }
             return [2 /*return*/, responseSchema.parse(json)];
         }

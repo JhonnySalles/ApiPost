@@ -24,6 +24,13 @@ export function classifyThreadsError(error: any): ThreadsErrorInfo {
         errorMessage = String(error);
     }
 
+    if (!errorCode && errorMessage) {
+        const codeMatch = errorMessage.match(/\[Threads API Code (\d+)\]/i) || errorMessage.match(/code\s*[:=]\s*(\d+)/i);
+        if (codeMatch) {
+            errorCode = parseInt(codeMatch[1], 10);
+        }
+    }
+
     const lowerMsg = errorMessage.toLowerCase();
 
     // 1. Auth errors (Token expired/invalid - Code 190) -> NEVER retry
@@ -49,13 +56,16 @@ export function classifyThreadsError(error: any): ThreadsErrorInfo {
         lowerMsg.includes('invalid parameter') ||
         lowerMsg.includes('not ready') ||
         lowerMsg.includes('in_progress') ||
-        lowerMsg.includes('media container is not ready');
+        lowerMsg.includes('media container is not ready') ||
+        lowerMsg.includes('the requested resource does not exist');
 
     // 4. Transient unknown errors (Code 1, Code 2, Network errors, 5xx)
     const isTransient =
         errorCode === 1 ||
         errorCode === 2 ||
         lowerMsg.includes('unknown error') ||
+        lowerMsg.includes('unexpected error') ||
+        lowerMsg.includes('please retry your request later') ||
         lowerMsg.includes('timeout') ||
         lowerMsg.includes('econnreset') ||
         lowerMsg.includes('temporarily unavailable') ||
