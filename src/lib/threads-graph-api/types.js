@@ -56,7 +56,9 @@ export var ThreadsMediaObjectSchema = z.object({
     children: z.array(z.string()).optional(),
     is_quote_post: z.boolean().optional(),
     is_reply: z.boolean().optional(),
+    status: z.string().optional(),
     status_code: z.string().optional(),
+    error_message: z.string().optional(),
 });
 export var ThreadsReplySchema = z.object({
     id: z.string().optional(),

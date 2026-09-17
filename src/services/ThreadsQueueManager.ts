@@ -214,18 +214,19 @@ class ThreadsQueueManager {
             try {
                 const mediaObj = await client.getMediaObject({
                     id: containerId,
-                    fields: ['id', 'status_code'],
+                    fields: ['id', 'status', 'error_message'],
                 });
 
-                const statusCode = mediaObj.status_code;
-                Logger.info(`[ThreadsQueue] Status do contêiner ${containerId}: ${statusCode}`);
+                const containerStatus = mediaObj.status || mediaObj.status_code;
+                Logger.info(`[ThreadsQueue] Status do contêiner ${containerId}: ${containerStatus}`);
 
-                if (statusCode === 'FINISHED') {
+                if (containerStatus === 'FINISHED' || containerStatus === 'PUBLISHED') {
                     return;
                 }
 
-                if (statusCode === 'ERROR' || statusCode === 'EXPIRED') {
-                    throw new Error(`Contêiner ${containerId} falhou com status: ${statusCode}`);
+                if (containerStatus === 'ERROR' || containerStatus === 'EXPIRED') {
+                    const errorDetail = mediaObj.error_message ? `: ${mediaObj.error_message}` : '';
+                    throw new Error(`Contêiner ${containerId} falhou com status ${containerStatus}${errorDetail}`);
                 }
             } catch (err: any) {
                 if (err instanceof ThreadsApiError) {

@@ -126,7 +126,9 @@ export declare const ThreadsMediaObjectSchema: z.ZodObject<{
     children: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     is_quote_post: z.ZodOptional<z.ZodBoolean>;
     is_reply: z.ZodOptional<z.ZodBoolean>;
+    status: z.ZodOptional<z.ZodString>;
     status_code: z.ZodOptional<z.ZodString>;
+    error_message: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     id?: string | undefined;
     media_product_type?: string | undefined;
@@ -142,7 +144,9 @@ export declare const ThreadsMediaObjectSchema: z.ZodObject<{
     children?: string[] | undefined;
     is_quote_post?: boolean | undefined;
     is_reply?: boolean | undefined;
+    status?: string | undefined;
     status_code?: string | undefined;
+    error_message?: string | undefined;
 }, {
     id?: string | undefined;
     media_product_type?: string | undefined;
@@ -158,7 +162,9 @@ export declare const ThreadsMediaObjectSchema: z.ZodObject<{
     children?: string[] | undefined;
     is_quote_post?: boolean | undefined;
     is_reply?: boolean | undefined;
+    status?: string | undefined;
     status_code?: string | undefined;
+    error_message?: string | undefined;
 }>;
 export type ThreadsMediaObject = z.infer<typeof ThreadsMediaObjectSchema>;
 export type ThreadsMediaObjectField = keyof ThreadsMediaObject;
@@ -351,7 +357,9 @@ export declare const GetMediaObjectResponseSchema: z.ZodObject<{
     children: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
     is_quote_post: z.ZodOptional<z.ZodBoolean>;
     is_reply: z.ZodOptional<z.ZodBoolean>;
+    status: z.ZodOptional<z.ZodString>;
     status_code: z.ZodOptional<z.ZodString>;
+    error_message: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     id?: string | undefined;
     media_product_type?: string | undefined;
@@ -367,7 +375,9 @@ export declare const GetMediaObjectResponseSchema: z.ZodObject<{
     children?: string[] | undefined;
     is_quote_post?: boolean | undefined;
     is_reply?: boolean | undefined;
+    status?: string | undefined;
     status_code?: string | undefined;
+    error_message?: string | undefined;
 }, {
     id?: string | undefined;
     media_product_type?: string | undefined;
@@ -383,7 +393,9 @@ export declare const GetMediaObjectResponseSchema: z.ZodObject<{
     children?: string[] | undefined;
     is_quote_post?: boolean | undefined;
     is_reply?: boolean | undefined;
+    status?: string | undefined;
     status_code?: string | undefined;
+    error_message?: string | undefined;
 }>;
 export type GetMediaObjectResponse = z.infer<typeof GetMediaObjectResponseSchema>;
 export type GetRepliesParams = {
