@@ -20,6 +20,12 @@ interface ImagePayload {
     platforms?: Platform[];
 }
 
+interface ScheduledPlatformItem {
+    platform: string;
+    jobId?: string;
+    publishTime?: string;
+}
+
 interface PublishAllPayload {
     platforms: Platform[];
     text?: string;
@@ -40,6 +46,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
     const totalPlatforms = platforms.length;
 
     const successfulPlatforms: string[] = [];
+    const scheduled: ScheduledPlatformItem[] = [];
     const failedPlatforms: { platform: string; reason: string }[] = [];
 
     const dbRef = (instanceId && postId && db) ? db.ref(`${BASE_DOCUMENT}/${instanceId}/${postId}`) : null;
@@ -87,6 +94,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
         let status: 'success' | 'scheduled' | 'error' = 'success';
         let errorDetails: string | null = null;
         let publishTime: string | undefined = undefined;
+        let jobId: string | undefined = undefined;
 
         const imagesPost = images?.filter(image => !image.platforms || image.platforms.length === 0 || image.platforms.includes(platform)).map(image => image.base64);
         const urlsPost = (imagesUrls && (platform === TUMBLR || platform === THREADS)) ? images?.map((image, index) => ({ ...image, url: imagesUrls[index] })).filter(image => !image.platforms || image.platforms.length === 0 || image.platforms.includes(platform)).map(image => image.url) : undefined;
@@ -115,15 +123,24 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                 case THREADS:
                     const threadsResult = await handleThreadsPost({ text: text || '', images: imagesPost, urls: urlsPost, tags, instanceId, postId });
                     status = threadsResult.scheduled ? 'scheduled' : (threadsResult.success ? 'success' : 'error');
+                    jobId = threadsResult.data?.jobId;
                     break;
                 default:
                     throw new ValidationError(`Plataforma desconhecida: ${platform}`);
             }
 
-            if (process.env.NODE_ENV !== 'test')
-                Logger.info(`[Publish All] Sucesso ao postar em: ${platform}`);
-
-            successfulPlatforms.push(platform);
+            if (status === 'scheduled') {
+                if (process.env.NODE_ENV !== 'test')
+                    Logger.info(`[Publish All] Postagem agendada/enfileirada em: ${platform}${jobId ? ` (jobId: ${jobId})` : ''}`);
+                const scheduledItem: ScheduledPlatformItem = { platform };
+                if (jobId) scheduledItem.jobId = jobId;
+                if (publishTime) scheduledItem.publishTime = publishTime;
+                scheduled.push(scheduledItem);
+            } else {
+                if (process.env.NODE_ENV !== 'test')
+                    Logger.info(`[Publish All] Sucesso ao postar em: ${platform}`);
+                successfulPlatforms.push(platform);
+            }
         } catch (error: any) {
             status = 'error';
             errorDetails = error.message || 'Erro desconhecido';
@@ -145,6 +162,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
                 progress,
                 error: errorDetails,
                 publishTime,
+                jobId,
             });
         }
     }
@@ -153,15 +171,16 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
         if (process.env.NODE_ENV !== 'test')
             Logger.info(`[Publish All] Gravando sumário final no Firebase para o job: ${postId}`);
         try {
-            const hasPendingThreads = platforms.includes(THREADS);
+            const hasPendingThreads = platforms.includes(THREADS) && scheduled.some(item => item.platform === THREADS);
             const summaryStatus = hasPendingThreads
                 ? 'processing'
-                : (failedPlatforms.length === 0 ? 'completed' : (successfulPlatforms.length === 0 ? 'failed' : 'completed_with_errors'));
+                : (failedPlatforms.length === 0 ? 'completed' : (successfulPlatforms.length === 0 && scheduled.length === 0 ? 'failed' : 'completed_with_errors'));
 
             await dbRef.child('_summary').update({
                 status: summaryStatus,
                 completedAt: hasPendingThreads ? null : new Date().toISOString(),
                 successful: successfulPlatforms,
+                scheduled: scheduled,
                 failed: failedPlatforms,
             });
         } catch (dbError) {
@@ -180,6 +199,7 @@ async function processPublishAllRequest(payload: PublishAllPayload) {
             status: 'completed',
             summary: {
                 successful: successfulPlatforms,
+                scheduled: scheduled,
                 failed: failedPlatforms,
             }
         });

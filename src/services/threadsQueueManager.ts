@@ -197,23 +197,29 @@ class ThreadsQueueManager {
                 try {
                     const summaryRef = dbRef.child('_summary');
                     const snap = await summaryRef.once('value');
-                    if (snap.exists()) {
-                        const summary = snap.val() || {};
-                        const successful: string[] = Array.isArray(summary.successful) ? summary.successful : [];
-                        const failed: any[] = Array.isArray(summary.failed) ? summary.failed : [];
+                    const summary = snap.val() || {
+                        startedAt: new Date(job.createdAt).toISOString(),
+                        total: 1,
+                        platforms: ['threads'],
+                    };
+                    const successful: string[] = Array.isArray(summary.successful) ? summary.successful : [];
+                    const failed: any[] = Array.isArray(summary.failed) ? summary.failed : [];
+                    const scheduled: any[] = Array.isArray(summary.scheduled) ? summary.scheduled : [];
 
-                        if (!successful.includes('threads')) {
-                            successful.push('threads');
-                        }
-                        const updatedFailed = failed.filter(item => typeof item === 'object' ? item.platform !== 'threads' : item !== 'threads');
-
-                        await summaryRef.update({
-                            successful,
-                            failed: updatedFailed,
-                            status: updatedFailed.length === 0 ? 'completed' : 'completed_with_errors',
-                            completedAt: new Date().toISOString(),
-                        });
+                    if (!successful.includes('threads')) {
+                        successful.push('threads');
                     }
+                    const updatedScheduled = scheduled.filter(p => typeof p === 'object' ? p.platform !== 'threads' : p !== 'threads');
+                    const updatedFailed = failed.filter(item => typeof item === 'object' ? item.platform !== 'threads' : item !== 'threads');
+
+                    await summaryRef.update({
+                        ...summary,
+                        successful,
+                        scheduled: updatedScheduled,
+                        failed: updatedFailed,
+                        status: updatedFailed.length === 0 ? 'completed' : 'completed_with_errors',
+                        completedAt: new Date().toISOString(),
+                    });
                 } catch (summaryErr) {
                     Logger.error('[ThreadsQueue] Erro ao sincronizar _summary no Firebase após sucesso:', summaryErr);
                 }
@@ -234,28 +240,34 @@ class ThreadsQueueManager {
                 try {
                     const summaryRef = dbRef.child('_summary');
                     const snap = await summaryRef.once('value');
-                    if (snap.exists()) {
-                        const summary = snap.val() || {};
-                        const successful: string[] = Array.isArray(summary.successful) ? summary.successful : [];
-                        const failed: any[] = Array.isArray(summary.failed) ? summary.failed : [];
+                    const summary = snap.val() || {
+                        startedAt: new Date(job.createdAt).toISOString(),
+                        total: 1,
+                        platforms: ['threads'],
+                    };
+                    const successful: string[] = Array.isArray(summary.successful) ? summary.successful : [];
+                    const failed: any[] = Array.isArray(summary.failed) ? summary.failed : [];
+                    const scheduled: any[] = Array.isArray(summary.scheduled) ? summary.scheduled : [];
 
-                        const updatedSuccessful = successful.filter(p => p !== 'threads');
-                        const existingFailedIndex = failed.findIndex(item => typeof item === 'object' && item.platform === 'threads');
-                        const failedEntry = { platform: 'threads', reason: errorMsg || 'Erro ao postar no Threads.' };
+                    const updatedSuccessful = successful.filter(p => p !== 'threads');
+                    const updatedScheduled = scheduled.filter(p => typeof p === 'object' ? p.platform !== 'threads' : p !== 'threads');
+                    const existingFailedIndex = failed.findIndex(item => typeof item === 'object' && item.platform === 'threads');
+                    const failedEntry = { platform: 'threads', reason: errorMsg || 'Erro ao postar no Threads.' };
 
-                        if (existingFailedIndex >= 0) {
-                            failed[existingFailedIndex] = failedEntry;
-                        } else {
-                            failed.push(failedEntry);
-                        }
-
-                        await summaryRef.update({
-                            successful: updatedSuccessful,
-                            failed,
-                            status: updatedSuccessful.length === 0 ? 'failed' : 'completed_with_errors',
-                            completedAt: new Date().toISOString(),
-                        });
+                    if (existingFailedIndex >= 0) {
+                        failed[existingFailedIndex] = failedEntry;
+                    } else {
+                        failed.push(failedEntry);
                     }
+
+                    await summaryRef.update({
+                        ...summary,
+                        successful: updatedSuccessful,
+                        scheduled: updatedScheduled,
+                        failed,
+                        status: updatedSuccessful.length === 0 ? 'failed' : 'completed_with_errors',
+                        completedAt: new Date().toISOString(),
+                    });
                 } catch (summaryErr) {
                     Logger.error('[ThreadsQueue] Erro ao sincronizar _summary no Firebase após erro:', summaryErr);
                 }
@@ -350,7 +362,7 @@ class ThreadsQueueManager {
                 Logger.warn(`[Threads] Ignorado o envio do post.`);
             }
 
-            await sleep((Math.floor(Math.random() * 2) + 1) * 200);
+            await sleep((Math.floor(Math.random() * 2) + 1) * 2000);
 
             if (process.env.NODE_ENV === 'test' && process.env.TEST_ERROR) {
                 throw new Error('Teste de excessão');

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { protect } from '../middleware/authMiddleware';
 import { ValidationError } from '../errors/ValidationError';
-import { threadsQueue, ThreadsPostOptions } from '../services/ThreadsQueueManager';
+import { threadsQueue, ThreadsPostOptions } from '../services/threadsQueueManager';
 
 const router = Router();
 
